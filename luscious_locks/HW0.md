@@ -311,22 +311,26 @@ int main() {
 	printf("result = %d, %s | %d | %s", result, buffer1, i, buffer2);
 	return 0;
 }
+
 4. What does one need to define before including `getline()`?
 define _GNU_SOURCE
-5. Write a C program to print out the content of a file line-by-line using `getline()`.
+
+5. Write a C program to print out the content of a file line-by-line using `getline()`
 
 ## C Development
 
 These are general tips for compiling and developing using a compiler and git. Some web searches will be useful here
 
-1. What compiler flag is used to generate a debug build?
-2. You modify the Makefile to generate debug builds and type `make` again.
-gets() may cause overflow of other variables since it accepts extra bytes of input.
+1. What compiler flag is used to generate a debug build? -g
+2. You modify the Makefile to generate debug builds and type `make` again. 
 3. Are tabs or spaces used to indent the commands after the rule in a Makefile?
-4. What does `git commit` do? What's a `sha` in the context of git?
-5. What does `git log` show you?
-6. What does `git status` tell you and how would the contents of `.gitignore` change its output?
+
+4. What does `git commit` do? What's a `sha` in the context of git? git commit allows updating changes to repos. sha stands for short hash algorithm
+5. What does `git log` show you? git log shows commit flag
+6. What does `git status` tell you and how would the contents of `.gitignore` change its output? 
+git status displays the status of working directory. 
 7. What does `git push` do? Why is it not just sufficient to commit with `git commit -m 'fixed all bugs' `?
+git push update commits online. commit message should include more information about the changes
 8. What does a non-fast-forward error `git push` reject mean? What is the most common way of dealing with this?
 
 ## Optional (Just for fun)
