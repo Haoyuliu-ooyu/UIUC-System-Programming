@@ -317,6 +317,22 @@ define _GNU_SOURCE
 
 5. Write a C program to print out the content of a file line-by-line using `getline()`
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+
+int main() {
+	FILE* fil = fopen("input.txt", "r");
+	char* buffer = NULL;
+	size_t capacity = 0;
+	while(getline(&buffer, &capacity, fil) != -1) {
+		printf("%s", buffer);
+	}
+	fclose(fi);
+	free(buffer);
+	return EXIT_SUCCESS
+}
+
 ## C Development
 
 These are general tips for compiling and developing using a compiler and git. Some web searches will be useful here
