@@ -11,6 +11,7 @@
 char **camel_caser(const char *input_str) {
     // TODO: Implement me!
     if (!input_str) {
+        printf("reached here!\n");
         return NULL;
     }
     //initializing space for each array;
@@ -21,17 +22,18 @@ char **camel_caser(const char *input_str) {
     char c;
     while ((c = input_str[iter++])) {
         if (ispunct(c)) {
-            outputs_s = (char**)realloc(outputs_s, (numSen + 1)*sizeof(char*));
-            outputs_s[numSen] = calloc(numChar + 1, sizeof(char));
+            outputs_s = realloc(outputs_s, (numSen + 1)*sizeof(char*));
+            outputs_s[numSen] = calloc(numChar+1, sizeof(char));
             outputs_s[numSen][numChar] = '\0';
-            numChar = 0;
             numSen++;
+            numChar = 0;
         } else if (isspace(c)) {
             continue;
         } else {
             numChar++;
         }
     }
+    outputs_s = realloc(outputs_s, (numSen + 1)*sizeof(char*));
     outputs_s[numSen] = NULL;
     //fill out arrays
     numSen = 0;
@@ -70,8 +72,10 @@ char **camel_caser(const char *input_str) {
 
 void destroy(char **result) {
     // TODO: Implement me!
-    for (size_t i = 0; i < (sizeof(result) / sizeof(char*)); i++) {
-        free(result[i]);
+    char* c;
+    int iter = 0;
+    while ((c = result[iter++])) {
+        free(c);
     }
     free(result);
     return;

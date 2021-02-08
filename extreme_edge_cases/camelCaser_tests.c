@@ -22,30 +22,38 @@ int test_camelCaser(char **(*camelCaser)(const char *),
     int to_return = !strcmp(expected, result_str);
     destroy(result);
     */
+   //test null
+   char** t = (*camelCaser)(NULL);
+   if (t != NULL) {
+       return 0;
+   }
    char* tests[] = {
         "All the world’s a stage. and all the men and women merely players. They have their exits and their entrances. And one man in his time plays many parts.",
         ".",
-        "123 test with numbers. 345test without space",
+        "123 test with numbers. 345test without space.",
+        " . . .",
         ".start with punct.",
         "TeSt CapiTaliZe.",
+        "ayaya clap. pog pog no punct",
+        "",
         NULL
    };
-   char* expected[15][15] = {
-       {"allTheWorld’sAStage", "andAllTheMenAndWomenMerelyPlayers", "theyHaveTheirExitsAndTheirEntrances", "andOneManInHisTimePlaysManyParts"},
-       {""},
-       {"123TestWithNumbers", "345test without space"},
-       {"", "startWithPunct"},
-       {"testCapitalize"},
-       {NULL}
+   char* expected[9][9] = {
+       {"allTheWorld’sAStage", "andAllTheMenAndWomenMerelyPlayers", "theyHaveTheirExitsAndTheirEntrances", "andOneManInHisTimePlaysManyParts", NULL},
+       {"", NULL},
+       {"123TestWithNumbers", "345testWithoutSpace", NULL},
+       {"", "", "", NULL},
+       {"", "startWithPunct", NULL},
+       {"testCapitalize", NULL},
+       {"ayayaClap", NULL},
+       {NULL},
+       {NULL}  
    };
     int i = 0;
     char** c = tests;
     while (*c) {
         int j = 0;
         char** output = (*camelCaser)(*c);
-        if (output == NULL && !strcmp(expected[i][j], "")) {
-            continue;
-        }
         while (output[j]) {
             printf("comparing: %s, %s\n", output[j], expected[i][j]);
             if (strcmp(output[j], expected[i][j])) {
@@ -56,9 +64,10 @@ int test_camelCaser(char **(*camelCaser)(const char *),
             printf("passed: %s, %s\n", output[j], expected[i][j]);
             j++;
         }
-        (*destroy)(output);
         i++;
         c++;
+        (*destroy)(output);
+        printf("destroyed\n");
     }
 
     return 1;
