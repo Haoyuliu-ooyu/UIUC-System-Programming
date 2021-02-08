@@ -12,16 +12,6 @@
 int test_camelCaser(char **(*camelCaser)(const char *),
                     void (*destroy)(char **)) {
     // TODO: Implement me!
-    /*
-    char* temp = "hello world.";
-    char* expected = "helloWorld";
-    char** result = camelCaser(temp);
-    char* result_str = result[0];
-    printf("expected:%s\n", expected);
-    printf("result:%s\n", result_str);
-    int to_return = !strcmp(expected, result_str);
-    destroy(result);
-    */
    //test null
    char** t = (*camelCaser)(NULL);
    if (t != NULL) {
@@ -35,10 +25,11 @@ int test_camelCaser(char **(*camelCaser)(const char *),
         ".start with punct.",
         "TeSt CapiTaliZe.",
         "ayaya clap. pog pog no punct",
+        "teSt CapitaLize. Up grade",
         "",
         NULL
    };
-   char* expected[9][9] = {
+   char* expected[15][15] = {
        {"allTheWorld’sAStage", "andAllTheMenAndWomenMerelyPlayers", "theyHaveTheirExitsAndTheirEntrances", "andOneManInHisTimePlaysManyParts", NULL},
        {"", NULL},
        {"123TestWithNumbers", "345testWithoutSpace", NULL},
@@ -46,6 +37,7 @@ int test_camelCaser(char **(*camelCaser)(const char *),
        {"", "startWithPunct", NULL},
        {"testCapitalize", NULL},
        {"ayayaClap", NULL},
+       {"testCapitalize", "upGrade", NULL},
        {NULL},
        {NULL}  
    };
@@ -54,20 +46,18 @@ int test_camelCaser(char **(*camelCaser)(const char *),
     while (*c) {
         int j = 0;
         char** output = (*camelCaser)(*c);
+        if(!strcmp(*c, "")) {
+            if (output[0] != NULL) return 0;
+        }
         while (output[j]) {
-            printf("comparing: %s, %s\n", output[j], expected[i][j]);
             if (strcmp(output[j], expected[i][j])) {
-                printf("output:%s\n", output[j]);
-                printf("expected:%s\n", expected[i][j]);
                 return 0;
             }
-            printf("passed: %s, %s\n", output[j], expected[i][j]);
             j++;
         }
         i++;
         c++;
         (*destroy)(output);
-        printf("destroyed\n");
     }
 
     return 1;

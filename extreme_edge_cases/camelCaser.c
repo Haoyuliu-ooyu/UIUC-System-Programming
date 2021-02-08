@@ -11,7 +11,6 @@
 char **camel_caser(const char *input_str) {
     // TODO: Implement me!
     if (!input_str) {
-        printf("reached here!\n");
         return NULL;
     }
     //initializing space for each array;
