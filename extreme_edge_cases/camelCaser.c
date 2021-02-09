@@ -54,13 +54,17 @@ char **camel_caser(const char *input_str) {
             capitalize = 1;
         } else {
             if (isalpha(c)) {
-                if (capitalize && (!starting)) put = toupper(c);
-                else put = tolower(c);
+                if (capitalize && (!starting)) {put = toupper(c);}
+                else {put = tolower(c);}
+                capitalize = 0;
+            } else if ((!(isalpha(c))) && starting) {
+                capitalize = 0;
+                put = c;
             } else {
                 put = c;
             }
+
             outputs_s[numSen][numChar] = put;
-            capitalize = 0;
             starting = 0;
             numChar++;
         }
