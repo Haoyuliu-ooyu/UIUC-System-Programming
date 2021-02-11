@@ -60,6 +60,5 @@ int main() {
     //
     char i[] = {1, 2, 0, 0};
     the_end((void*)i, (void*)i);
-    free(i);
     return 0;
 }
