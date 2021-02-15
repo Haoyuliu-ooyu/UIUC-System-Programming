@@ -4,6 +4,7 @@
  */
 #include "vector.h"
 #include <assert.h>
+#include <stdio.h>
 
 /**
  * 'INITIAL_CAPACITY' the initial size of the dynamically.
@@ -99,11 +100,7 @@ vector *vector_create(copy_constructor_type copy_constructor,
     for (size_t i = 0; i < INITIAL_CAPACITY; i++) {
         v->array[i] = NULL;
     }
-    // Casting to void to remove complier error. Remove this line when you are
-    // ready.
-    (void)INITIAL_CAPACITY;
-    (void)get_new_capacity;
-    return NULL;
+    return v;
 }
 
 void vector_destroy(vector *this) {
@@ -137,37 +134,24 @@ size_t vector_size(vector *this) {
 void vector_resize(vector *this, size_t n) {
     assert(this);
     // your code here
-    assert(n >= 0);
-    size_t init_size = this->size;
-    size_t init_cap = this->capacity;
-    if (n == init_size) {
-        return;
-    } else if (n < init_size) {
-        this->size = n;
-        for (size_t i = n; i < init_size; i++) {
-            (*this->destructor)(this->array[i]);
-            this->array[i] = NULL;
+    assert(n>=0);
+    if (n > this->capacity) {
+        this->capacity = get_new_capacity(n);
+        this->array = realloc(this->array, this->capacity * sizeof(void *));
+        for (size_t i = this->size; i < n; ++i){
+            this->array[i] = (*this->default_constructor)();
         }
-    } else if (n > init_size && n <= init_cap) {
-        this->size = n;
-        for (size_t i = init_size; i < n; i++) {
-            this->array[i] = (*this->default_constructor);
+    } else if (n > this->size) {
+        for (size_t index = this->size; index < n; ++index) {
+            this->array[index] = (*this->default_constructor)();
         }
     } else {
-        /*
-        size_t new_cap = init_cap;
-        while(new_cap < n) {
-            new_cap *= GROWTH_FACTOR;
+        size_t curr_size = this->size;
+        while (curr_size > n) {
+            (*this->destructor)(this->array[--curr_size]);
         }
-        this->array = realloc(this->array, sizeof(void*) * new_cap);
-        this->size = n;
-        this->capacity = new_cap;
-        for (size_t i = init_cap; i < n; i++) {
-            this->array[i] = NULL;
-        }
-        */
-       vector_reserve(this, n);
     }
+    this->size = n;
 }
 
 size_t vector_capacity(vector *this) {
@@ -186,17 +170,13 @@ void vector_reserve(vector *this, size_t n) {
     assert(this);
     // your code here
     assert(n >= 0);
-    size_t init_cap = this->capacity;
-    size_t new_cap = init_cap;
-        while(new_cap < n) {
-            new_cap *= GROWTH_FACTOR;
+    if (this->capacity < n) {
+        this->capacity = get_new_capacity(n);
+        this->array = realloc(this->array, this->capacity * sizeof(void *));
+        for (size_t i = this->size; i < n; ++i){
+            this->array[i] = (*this->default_constructor)();
         }
-        this->array = realloc(this->array, sizeof(void*) * new_cap);
-        this->size = n;
-        this->capacity = new_cap;
-        for (size_t i = init_cap; i < n; i++) {
-            this->array[i] = NULL;
-        }
+    }
 }
 
 void **vector_at(vector *this, size_t position) {
@@ -205,7 +185,7 @@ void **vector_at(vector *this, size_t position) {
     assert(position < this->size);
     assert(position >= 0);
     if (this->array[position]) {
-        return &this->array[position];
+        return this->array + position;
     }
     return NULL;
 }
@@ -256,7 +236,7 @@ void vector_pop_back(vector *this) {
     assert(this);
     // your code here
     (*this->destructor)(this->array[this->size - 1]);
-    this->size = this->size--;
+    this->size = this->size - 1;
 }
 
 void vector_insert(vector *this, size_t position, void *element) {
@@ -270,9 +250,7 @@ void vector_insert(vector *this, size_t position, void *element) {
         }
         this->array[position] = (*this->copy_constructor)(element);
     } else {
-        if (element) {
-            this->array[position] = (*this->copy_constructor)(element);
-        }
+        this->array[position] = (*this->copy_constructor)(element);
     }
 }
 
