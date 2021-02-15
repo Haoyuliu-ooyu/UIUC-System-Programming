@@ -182,12 +182,13 @@ void vector_reserve(vector *this, size_t n) {
 void **vector_at(vector *this, size_t position) {
     assert(this);
     // your code here
-    assert(position < this->size);
     assert(position >= 0);
-    if (this->array[position]) {
-        return this->array + position;
+    assert(position < this->size);
+    if (!this->array[position]) {
+        assert(0);
+    } else {
+        return &this->array[position];
     }
-    return NULL;
 }
 
 void vector_set(vector *this, size_t position, void *element) {
@@ -204,12 +205,11 @@ void vector_set(vector *this, size_t position, void *element) {
 void *vector_get(vector *this, size_t position) {
     assert(this);
     // your code here
-    assert(position < this->size);
-    assert(position >= 0);
-    if (this->array[position]) {
+    if (!this->array[position]) {
+        assert(0);
+    } else {
         return this->array[position];
     }
-    return NULL;
 }
 
 void **vector_front(vector *this) {
@@ -259,10 +259,10 @@ void vector_erase(vector *this, size_t position) {
     assert(position < vector_size(this));
     // your code here
     (*this->destructor)(this->array[position]);
-    for (size_t i = position; i < this->size - 1; i++) {
+    for (size_t i = position; i < this->size; i++) {
             this->array[i] = this->array[i + 1];
     }
-    vector_resize(this, this->size-1);
+    this->size = this->size - 1;
 }
 
 void vector_clear(vector *this) {
