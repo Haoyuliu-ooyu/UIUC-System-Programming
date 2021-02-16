@@ -60,6 +60,9 @@ vector *sstring_split(sstring *this, char delimiter) {
         *stop = temp;
         c = stop + 1;
     }
+    if (*(this->str + strlen(this->str) - 1) == delimiter) {
+        vector_push_back(vec, "");
+    }
     return vec;
 }
 

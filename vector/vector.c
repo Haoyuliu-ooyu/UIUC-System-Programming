@@ -225,6 +225,7 @@ void vector_push_back(vector *this, void *element) {
     // your code here
     vector_resize(this, this->size+1);
     if (element) {
+        (*this->destructor)(this->array[this->size - 1]);
         this->array[this->size - 1] = (*this->copy_constructor)(element);
     }
 }
