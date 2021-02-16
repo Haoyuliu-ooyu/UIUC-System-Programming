@@ -138,11 +138,11 @@ void vector_resize(vector *this, size_t n) {
     if (n > this->capacity) {
         this->capacity = get_new_capacity(n);
         this->array = realloc(this->array, this->capacity * sizeof(void *));
-        for (size_t i = this->size; i < n; ++i){
+        for (size_t i = this->size; i < n; i++){
             this->array[i] = (*this->default_constructor)();
         }
     } else if (n > this->size) {
-        for (size_t index = this->size; index < n; ++index) {
+        for (size_t index = this->size; index < n; index++) {
             this->array[index] = (*this->default_constructor)();
         }
     } else {
@@ -173,9 +173,6 @@ void vector_reserve(vector *this, size_t n) {
     if (this->capacity < n) {
         this->capacity = get_new_capacity(n);
         this->array = realloc(this->array, this->capacity * sizeof(void *));
-        for (size_t i = this->size; i < n; ++i){
-            this->array[i] = (*this->default_constructor)();
-        }
     }
 }
 
@@ -242,8 +239,8 @@ void vector_pop_back(vector *this) {
 void vector_insert(vector *this, size_t position, void *element) {
     assert(this);
     // your code here
-    size_t init_size = vector_size(this);
-    vector_resize(this, this->size+1);
+    
+    /*
     if (position < init_size) {
         for (size_t i = position+1; i < this->size; i++) {
             this->array[i] = this->array[i - 1];
@@ -252,6 +249,18 @@ void vector_insert(vector *this, size_t position, void *element) {
     } else {
         this->array[position] = (*this->copy_constructor)(element);
     }
+    */
+   assert(position <= this->size);
+   if (this->size == this->capacity) {
+       size_t new_cap = get_new_capacity(this->size + 1);
+       this->array = realloc(this->array, sizeof(void*) * new_cap);
+       this->capacity = new_cap;
+   }
+   for (size_t i = this->size; i >= position + 1; i--) {
+        this->array[i] = this->array[i - 1];
+    }
+    this->array[position] = (*this->copy_constructor)(element);
+    this->size = this->size + 1;
 }
 
 void vector_erase(vector *this, size_t position) {
