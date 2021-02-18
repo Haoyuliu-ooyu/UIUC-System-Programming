@@ -8,7 +8,7 @@
 
 int main() {
     // Enter the string you want to test with the reference here.
-    char *input = "1\tsdjgnsk.";
+    char *input = "1 23cs241.";
 
     // This function prints the reference implementation output on the terminal.
     print_camelCaser(input);
