@@ -27,6 +27,7 @@ static FILE *source = NULL;
 
 //functions:
 int define_command(char *command);
+int external(char* command, vector* inputs);
 int execute_single(int cmd_id, char* cmd, int save_to_history);
 void sig_handler(int sig);
 void shell_exit(int s);
@@ -43,6 +44,7 @@ int shell(int argc, char *argv[]) {
     processes = shallow_vector_create();
     source = stdin;
     detect_h_and_f(argc, argv);
+
     //
     size_t byte_read = 0;
     char *line = NULL;
@@ -68,23 +70,24 @@ void detect_h_and_f(int argc, char* argv[]) {
     int c;
     while ((c = getopt(argc, argv, "h:f:")) != -1) {
         if (c == 'h') {
-            FILE* history_file_stream = fopen(optarg, "r");
+            FILE *history_file_stream = fopen(optarg, "w");
             if (!history_file_stream) {
                 print_history_file_error();
                 shell_exit(1);
             }
-            char* cmd = malloc(256);
-            size_t i = 0;
-            while (getline(&cmd, &i, history_file_stream) != -1) {
-                if (cmd[strlen(cmd) - 1] == '\n') cmd[strlen(cmd) - 1] = '\0';
-                vector_push_back(history, cmd);
+            char *line = NULL;
+            size_t byte_read = 0;
+            while (getline(&line, &byte_read, history_file_stream) != -1) {
+                if (line[strlen(line) - 1] == '\n')
+                    line[strlen(line) -1] = '\0';
+                vector_push_back(history, (void *)line);
             }
-            free(cmd);
+            free(line);
             fclose(history_file_stream);
             history_file_stream = NULL;
             history_file = get_full_path(optarg);
         } else if (c == 'f') {
-            FILE* script_file_stream = fopen(optarg, "r");
+            FILE *script_file_stream = fopen(optarg, "r");
             if (!script_file_stream) {
                 print_script_file_error();
                 shell_exit(1);
@@ -225,7 +228,7 @@ int execute_single(int command_id, char *command, int save_to_history) {
         shell_exit(0);
         return 0;
     } else {
-        print_invalid_command(command);
+        external(vector_get(splited, 0), splited);
     }
     sstring_destroy(sstr);
     vector_destroy(splited);
@@ -298,6 +301,43 @@ int execute(char* command) {
     }
 }
 
+//externel
+int external(char* command, vector* inputs) {
+    pid_t pid = fork();
+    if (pid > 0) {
+        print_command_executed(pid);
+        int status = 0;
+        if (waitpid(pid, &status, 0) == -1) {
+            print_wait_failed();
+            shell_exit(-1);
+        } else if (WIFEXITED(status)) {
+            if (WEXITSTATUS(status) != 0){
+                shell_exit(1);
+            }
+            fflush(stdout);
+            kill(pid, SIGKILL);
+        } else if (WIFSIGNALED(status)) {
+            kill(pid, SIGKILL);
+        }
+        return status;
+    } else if (pid == 0) {
+        fflush(stdout);
+        char* argus[vector_size(inputs) + 1];
+        for (size_t i = 0; i < vector_size(inputs); i++) {
+            argus[i] = vector_get(inputs, i);
+        }
+        argus[vector_size(inputs)] = (char*) NULL;
+        execvp(vector_get(inputs, 0), argus);
+        print_exec_failed(command);
+        fflush(stdout);
+        exit(1);
+        return 1;
+    } else {
+        print_fork_failed();
+        shell_exit(1);
+        return 1;
+    }
+}
 
 //dealing with signals
 void sig_handler(int sig) {
@@ -316,6 +356,7 @@ char *get_directory(char *buffer) {
 
 //exit
 void shell_exit(int s) {
+
     if (history_file != NULL) {
         FILE *history_file_stream = fopen(history_file, "w");
         for (size_t i = 0; i < vector_size(history); ++i) {
