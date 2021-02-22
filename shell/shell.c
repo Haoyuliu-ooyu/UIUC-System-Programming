@@ -225,7 +225,7 @@ int execute_single(int command_id, char *command, int save_to_history) {
         shell_exit(0);
         return 0;
     } else {
-        
+        print_invalid_command(command);
     }
     sstring_destroy(sstr);
     vector_destroy(splited);
