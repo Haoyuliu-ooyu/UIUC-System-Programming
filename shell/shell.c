@@ -300,7 +300,7 @@ int execute(char* command) {
         return execute_single(define_command(command), command, 1);
     }
 }
-
+//
 //externel
 int external(char* command, vector* inputs) {
     pid_t pid = fork();
