@@ -356,9 +356,8 @@ char *get_directory(char *buffer) {
 
 //exit
 void shell_exit(int s) {
-
     if (history_file != NULL) {
-        FILE *history_file_stream = fopen(history_file, "w");
+        FILE *history_file_stream = fopen(history_file, "a+");
         for (size_t i = 0; i < vector_size(history); ++i) {
             fprintf(history_file_stream, "%s\n", vector_get(history, i));
         }
