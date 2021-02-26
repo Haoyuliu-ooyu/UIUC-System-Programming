@@ -33,12 +33,12 @@ void *mini_malloc(size_t request_size, const char *filename,
         return NULL;
     }
     meta_data *temp = malloc(sizeof(meta_data) + request_size);
-    if (temp == NULL) return NULL;
+    if (!temp) return NULL;
     temp->request_size = request_size;
     temp->filename = filename;
     temp->instruction = instruction;
     temp->next = NULL;
-    if (head == NULL) {
+    if (!head) {
         head = temp;
     } else {
         meta_data* curr = head;
@@ -56,6 +56,7 @@ void *mini_calloc(size_t num_elements, size_t element_size,
     // your code here
     size_t request_size = num_elements * element_size;
     void* temp = mini_malloc(request_size, filename, instruction);
+    if (!temp) {return NULL;}
     char* ptr = temp;
     for (size_t i = 0; i < request_size; i++) {
         *((char*)ptr + 1) = 0;
@@ -76,33 +77,32 @@ void *mini_realloc(void *payload, size_t request_size, const char *filename,
         return NULL;
     }
     meta_data* temp = ((meta_data*)payload) - 1;
-    if (temp == head) {
-        meta_data* _new = realloc(temp, request_size + sizeof(meta_data));
-        if (!_new) {return NULL;}
-        head = _new;
-    }
-    meta_data* _new = realloc(temp, request_size + sizeof(meta_data));
-        if (!_new) {return NULL;}
-    meta_data* prev = head;
-    while (prev->next != temp && prev->next != NULL) {
-        prev = prev->next;
-    }
-    if (_new != temp) {
-        if (prev != NULL) {
-            prev->next = _new;
-        } else {
-            head = _new;
+    meta_data* prev;
+    if (temp == head || head == NULL) {
+        prev = NULL;
+    } else {
+        prev = head;
+        while (prev->next != temp) {
+            prev = prev->next;
         }
     }
-    if (request_size < _new->request_size) {
-        total_memory_freed -= (_new->request_size - request_size);
+    meta_data* _new = realloc(temp, request_size + sizeof(meta_data));
+    if (!_new) {return NULL;}
+    if (_new != temp) {
+        if (prev != NULL)
+            prev->next = _new;
+        else
+            head = _new;
+    }
+    if (request_size <= _new->request_size) {
+        total_memory_freed += (_new->request_size - request_size);
     } else {
         total_memory_requested += (request_size - _new->request_size);
     }
     _new->request_size = request_size;
     _new -> filename = filename;
     _new ->instruction = instruction;
-    _new ->next = NULL;
+    _new ->next = temp->next;
     return (void*)(_new + 1);
 }
 
