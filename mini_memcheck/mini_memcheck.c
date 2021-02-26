@@ -56,10 +56,8 @@ void *mini_calloc(size_t num_elements, size_t element_size,
     // your code here
     size_t request_size = num_elements * element_size;
     void* temp = mini_malloc(request_size, filename, instruction);
-    if (!temp) {return NULL;}
-    char* ptr = temp;
     for (size_t i = 0; i < request_size; i++) {
-        *((char*)ptr + 1) = 0;
+        *((char*)temp + i) = 0;
     }
     return temp;
 }
