@@ -1,3 +1,4 @@
+//partner: xinshuo3, peiyuan3
 /**
  * mini_memcheck
  * CS 241 - Spring 2021
@@ -13,7 +14,7 @@ size_t total_memory_freed = 0;
 size_t total_memory_requested = 0;
 size_t invalid_addresses = 0;
 
-int is_invalid_addr(void *ptr) {
+int invalid(void *ptr) {
     if (head == NULL)
         return 1;
     meta_data *curr = head;
@@ -65,8 +66,44 @@ void *mini_calloc(size_t num_elements, size_t element_size,
 void *mini_realloc(void *payload, size_t request_size, const char *filename,
                    void *instruction) {
     // your code here
-
-    return NULL;
+    if (payload == NULL) {
+        return mini_malloc(request_size, filename, instruction);
+    } else if (invalid(payload)) {
+        invalid_addresses++;
+        return NULL;
+    }  else if (request_size == 0) {
+        mini_free(payload);
+        return NULL;
+    }
+    meta_data* temp = ((meta_data*)payload) - 1;
+    if (temp == head) {
+        meta_data* _new = realloc(temp, request_size + sizeof(meta_data));
+        if (!_new) {return NULL;}
+        head = _new;
+    }
+    meta_data* _new = realloc(temp, request_size + sizeof(meta_data));
+        if (!_new) {return NULL;}
+    meta_data* prev = head;
+    while (prev->next != temp && prev->next != NULL) {
+        prev = prev->next;
+    }
+    if (_new != temp) {
+        if (prev != NULL) {
+            prev->next = _new;
+        } else {
+            head = _new;
+        }
+    }
+    if (request_size < _new->request_size) {
+        total_memory_freed -= (_new->request_size - request_size);
+    } else {
+        total_memory_requested += (request_size - _new->request_size);
+    }
+    _new->request_size = request_size;
+    _new -> filename = filename;
+    _new ->instruction = instruction;
+    _new ->next = NULL;
+    return (void*)(_new + 1);
 }
 
 void mini_free(void *payload) {
@@ -74,7 +111,7 @@ void mini_free(void *payload) {
     if (payload == NULL) {
         return;
     }
-    if (is_invalid_addr(payload)) {
+    if (invalid(payload)) {
         invalid_addresses++;
         return;
     }
