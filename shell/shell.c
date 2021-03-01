@@ -317,16 +317,22 @@ int execute(char* command) {
     if (operator == NULL) {
         return execute_single(define_command(command), command, 1);
     } else if (!strcmp(operator, "&&")) {
+        vector_push_back(history, command);
         operator_and(command, loc);
     } else if (!strcmp(operator, "||")) {
+        vector_push_back(history, command);
         operator_or(command, loc);
     } else if (!strcmp(operator, ";")) {
+        vector_push_back(history, command);
         operator_sep(command, loc);
     } else if (!strcmp(operator, ">")) {
+        vector_push_back(history, command);
         operator_output(command, loc);
     } else if (!strcmp(operator, ">>")) {
+        vector_push_back(history, command);
         operator_append(command, loc);
     } else if (!strcmp(operator, "<")) {
+        vector_push_back(history, command);
         return 0;
     } else {
         return execute_single(define_command(command), command, 1);
@@ -338,9 +344,9 @@ int operator_and(char* cmd, char* loc) {
     strncpy(cmd_1, cmd, loc - cmd);
     cmd_1[loc - cmd -1] = '\0';
     char* cmd_2 = loc+3;
-    int cmd_1_rel = execute(cmd_1);
+    int cmd_1_rel = execute_single(define_command(cmd_1), cmd_1, 0);
     if (!cmd_1_rel) {
-        execute(cmd_2);
+        execute_single(define_command(cmd_2), cmd_2, 0);
     }
     return 0;
 }
@@ -350,9 +356,9 @@ int operator_or(char* cmd, char* loc) {
     strncpy(cmd_1, cmd, loc - cmd);
     cmd_1[loc - cmd - 1] = '\0';
     char* cmd_2 = loc+3;
-    int cmd_1_rel = execute(cmd_1);
+    int cmd_1_rel = execute_single(define_command(cmd_1), cmd_1, 0);
     if (cmd_1_rel) {
-        execute(cmd_2);
+        execute_single(define_command(cmd_2), cmd_2, 0);
     }
     return 0;
 }
@@ -362,8 +368,8 @@ int operator_sep(char* cmd, char* loc) {
     strncpy(cmd_1, cmd, loc - cmd);
     cmd_1[loc - cmd] = '\0';
     char* cmd_2 = loc+2;
-    execute(cmd_1);
-    execute(cmd_2);
+    execute_single(define_command(cmd_1), cmd_1, 0);
+    execute_single(define_command(cmd_2), cmd_2, 0);
     return 0;
 }
 //
@@ -376,7 +382,7 @@ int operator_output(char* cmd, char* loc) {
     int fildes = fileno(f);
     int saved_out = dup(fileno(stdout));
     dup2(fildes, fileno(stdout));
-    execute_single(define_command(cmd_1), cmd_1, 1);
+    execute_single(define_command(cmd_1), cmd_1, 0);
     fflush(stdout);
     close(fildes);
     dup2(saved_out, fileno(stdout));
@@ -392,7 +398,7 @@ int operator_append(char* cmd, char* loc) {
     int fildes = fileno(f);
     int saved_out = dup(fileno(stdout));
     dup2(fildes, fileno(stdout));
-    execute_single(define_command(cmd_1), cmd_1, 1);
+    execute_single(define_command(cmd_1), cmd_1, 0);
     fflush(stdout);
     close(fildes);
     dup2(saved_out, fileno(stdout));
@@ -405,6 +411,7 @@ int external(char* command, vector* inputs) {
     pid_t pid = fork();
     add_process(command, pid);
     if (pid > 0) {
+
         print_command_executed(pid);
         int status = 0;
         if (background) {
@@ -575,7 +582,7 @@ void shell_processes() {
 //exit
 void shell_exit(int s) {
     if (history_file != NULL) {
-        FILE *history_file_stream = fopen(history_file, "a+");
+        FILE *history_file_stream = fopen(history_file, "w");
         for (size_t i = 0; i < vector_size(history); ++i) {
             fprintf(history_file_stream, "%s\n", vector_get(history, i));
         }
