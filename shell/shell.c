@@ -45,6 +45,7 @@ int operator_or(char* cmd, char* loc);
 int operator_sep(char* cmd, char* loc);
 int operator_output(char* cmd, char* loc);
 int operator_append(char* cmd, char* loc);
+void shell_processes();
 
 //main function
 int shell(int argc, char *argv[]) {
@@ -97,7 +98,7 @@ void detect_h_and_f(int argc, char* argv[]) {
     int c;
     while ((c = getopt(argc, argv, "h:f:")) != -1) {
         if (c == 'h') {
-            FILE *history_file_stream = fopen(optarg, "a");
+            FILE *history_file_stream = fopen(optarg, "w");
             if (!history_file_stream) {
                 print_history_file_error();
                 shell_exit(1);
@@ -240,6 +241,7 @@ int execute_single(int command_id, char *command, int save_to_history) {
         print_no_history_match();
         return 1;
     } else if (command_id == 5) {
+        shell_processes();
         return 0;
     } else if (command_id == 6) {
        pid_t t_pid = atoi(vector_get(splited, 1));
@@ -304,10 +306,10 @@ int execute(char* command) {
         operator = "||";
     } else if ((loc = strstr(command, ";")) != NULL) {
         operator = ";";
-    } else if ((loc = strstr(command, ">")) != NULL) {
-        operator = ">";
     } else if ((loc = strstr(command, ">>")) != NULL) {
         operator = ">>";
+    } else if ((loc = strstr(command, ">")) != NULL) {
+        operator = ">";
     } else if ((loc = strstr(command, "<")) != NULL) {
         operator = "<";
     }
@@ -343,6 +345,91 @@ int operator_and(char* cmd, char* loc) {
     return 0;
 }
 
+void shell_processes() {
+    print_process_info_header();
+    size_t i = 0;
+    for (; i < vector_size(processes); i++) {
+        process* p = vector_get(processes, i);
+        if(kill(p -> pid,0) != -1){
+            process_info psinfo;
+            psinfo.command = p -> command;
+            psinfo.pid = p -> pid;
+            unsigned long long start_time = 0;
+            unsigned long long btime = 0;
+            //
+            FILE* fildes = fopen("/proc/stat", "r");
+            if (fildes) {
+                char* buffer = NULL;
+                size_t lenth;
+                ssize_t bytes_reads = getdelim( &buffer, &lenth, '\0', fildes );
+                if ( bytes_reads != -1) {
+                    sstring* s = cstr_to_sstring(buffer);
+                    vector* splited = sstring_split(s, '\n');
+                    size_t i = 0;
+                    for (; i < vector_size(splited); i++) {
+                        if (strncmp("btime", vector_get(splited, i), 5) == 0) {
+                            char str[10];
+                            sscanf(vector_get(splited, i), "%s %llu", str, &btime);
+                        }
+                    }
+                    vector_destroy(splited);
+                    sstring_destroy(s);
+                }
+            }
+            fclose(fildes); 
+            //
+            char path[100];
+            snprintf(path, sizeof(path), "/proc/%d/stat", p->pid);
+            FILE* fildes_sec = fopen(path, "r");
+
+            char time_str[20];
+            if (fildes_sec) {
+                char* buffer = NULL;
+                size_t len;
+                ssize_t bytes_reads = getdelim( &buffer, &len, '\0', fildes_sec);
+                if ( bytes_reads != -1) {
+                    sstring* s = cstr_to_sstring(buffer);
+                    vector* nums = sstring_split(s, ' ');
+                    //threads
+                    long int num_threads = 0;
+                    sscanf(vector_get(nums, 19), "%ld", &num_threads);
+                    psinfo.nthreads = num_threads;
+                    //virtual memory size
+                    unsigned long int v_m_size = 0;
+                    sscanf(vector_get(nums, 22), "%lu", &v_m_size);
+                    psinfo.vsize = v_m_size / 1024;
+                    //stat
+                    char stat;
+                    sscanf(vector_get(nums, 2), "%c", &stat);
+                    psinfo.state = stat;
+                    //time
+                    unsigned long utime = 0;
+                    sscanf(vector_get(nums, 13), "%lu", &utime);
+                    unsigned long stime = 0;
+                    unsigned long time = 0;
+                    sscanf(vector_get(nums, 14), "%lu", &stime);
+                    time = utime / sysconf(_SC_CLK_TCK) + stime / sysconf(_SC_CLK_TCK);
+                    unsigned long seconds = time % 60;
+                    unsigned long mins = (time - seconds) / 60;
+                    execution_time_to_string(time_str, 20, mins, seconds);
+                    psinfo.time_str = time_str;
+
+                    sscanf(vector_get(nums, 21), "%llu", &start_time);
+
+                    vector_destroy(nums);
+                    sstring_destroy(s);
+                }
+            }
+            fclose(fildes);
+            char start_str[20];
+            time_t start_time_final = btime + (start_time / sysconf(_SC_CLK_TCK));
+            time_struct_to_string(start_str, 20, localtime(&start_time_final));
+            psinfo.start_str = start_str;
+            print_process_info(&psinfo);  
+        }
+    }
+}
+
 int operator_or(char* cmd, char* loc) {
     char cmd_1[loc - cmd];
     strncpy(cmd_1, cmd, loc - cmd);
@@ -370,7 +457,7 @@ int operator_output(char* cmd, char* loc) {
     strncpy(cmd_1, cmd, loc - cmd);
     cmd_1[loc - cmd] = '\0';
     char* cmd_2 = loc+2;
-    FILE* f = fopen(cmd_2, "w+");
+    FILE* f = fopen(cmd_2, "w");
     int fildes = fileno(f);
     int saved_out = dup(fileno(stdout));
     dup2(fildes, fileno(stdout));
@@ -382,11 +469,11 @@ int operator_output(char* cmd, char* loc) {
 }
 //
 int operator_append(char* cmd, char* loc) {
-    char cmd_1[loc - cmd + 1];
+    char cmd_1[loc - cmd];
     strncpy(cmd_1, cmd, loc - cmd);
-    cmd_1[loc - cmd] = '\0';
-    char* cmd_2 = loc+2;
-    FILE* f = fopen(cmd_2, "a+");
+    cmd_1[loc - cmd -1] = '\0';
+    char* cmd_2 = loc+3;
+    FILE* f = fopen(cmd_2, "a");
     int fildes = fileno(f);
     int saved_out = dup(fileno(stdout));
     dup2(fildes, fileno(stdout));
