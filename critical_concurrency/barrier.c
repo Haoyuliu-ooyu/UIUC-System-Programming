@@ -1,7 +1,7 @@
 /**
  * critical_concurrency
  * CS 241 - Spring 2021
- partner: haoyul4, peiyuan3
+ partner: xinshuo3, peiyuan3
  */
 #include "barrier.h"
 

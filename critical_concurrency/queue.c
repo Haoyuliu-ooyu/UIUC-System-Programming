@@ -1,7 +1,7 @@
 /**
  * critical_concurrency
  * CS 241 - Spring 2021
- partner: haoyul4, peiyuan3
+ partner: xinshuo3, peiyuan3
  */
 #include "queue.h"
 #include <pthread.h>
@@ -68,11 +68,12 @@ void queue_destroy(queue *this) {
 void queue_push(queue *this, void *data) {
     /* Your code here */
     pthread_mutex_lock(&(this->m));
-    if (this->max_size > 0 && this->size == this->max_size) {
+    while (this->max_size > 0 && this->size == this->max_size) {
         pthread_cond_wait(&this->cv, &this->m);
     }
     queue_node * toAdd = malloc(sizeof(queue_node));
     toAdd->data = data;
+    toAdd->next = NULL;
     if (this->size == 0) {
         this->head = toAdd;
         this->tail = toAdd;

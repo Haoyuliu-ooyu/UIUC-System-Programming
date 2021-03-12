@@ -1,7 +1,7 @@
 /**
  * critical_concurrency
  * CS 241 - Spring 2021
- partner: haoyul4, xinshuo3
+ partner: peiyuan3, xinshuo3
  */
 
 #include "semamore.h"
