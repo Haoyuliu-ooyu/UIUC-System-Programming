@@ -41,6 +41,8 @@ static int flag = 0; //there is no freed block
 //functions
 meta_data* find_first_free_block(size_t);
 meta_data* request_space(size_t size);
+void merge(meta_data* ptr);
+void split(meta_data* ptr, size_t split_size);
 
 
 
@@ -117,7 +119,11 @@ void *malloc(size_t size) {
                 block = request_space(size);
                 if (!block) {return NULL;}
             } else { // found!
-                //todo:split
+                //force_printf("reached122\n");
+                if((block->size - size >= size) && (block->size - size >= META_SIZE)) {
+                    //force_printf("reached123\n");
+                    split(block, size);
+                }
                 block->free = 0;
             }
         }
@@ -151,6 +157,16 @@ void free(void *ptr) {
     meta_data* block = (meta_data*)ptr - 1;
     if (block->free == 1) {
         return;
+    }
+    //force_printf("reached161\n");
+    if(block->prev && block->prev->free == 1) {
+        //force_printf("reached162\n");
+        merge(block);
+    }
+    //force_printf("reached161\n");
+    if(block->next && block->next->free == 1) {
+        //force_printf("reached166\n");
+        merge(block->next);
     }
     block->free = 1;
 }
@@ -211,8 +227,19 @@ void *realloc(void *ptr, size_t size) {
     }
     struct meta_data* block = (meta_data*)ptr - 1;
     if (block->size >= size) {
-        //todo:split
-        return ptr;
+        //force_printf("reached230\n");
+        if (block->size - size >= META_SIZE) {
+            //force_printf("reached223\n");
+            split(block,size);
+            return block+1;
+        }
+    } else {
+        if (block->prev && block->prev->free && block->size + block->prev->size +sizeof(malloc) >= size) {
+            //force_printf("reached223\n");
+            merge(block);
+            split(block,size);
+            return block+1;
+        }
     }
     void* new_ptr = malloc(size);
     if (!new_ptr) {
@@ -254,10 +281,28 @@ meta_data* request_space(size_t size) {
     return block;
 }
 
-meta_data* split() {
-    return NULL;
+void split(meta_data* temp, size_t size) {
+    meta_data* new_space = (void*)temp + META_SIZE + size;
+    new_space->size = temp->size - size - META_SIZE;
+    new_space->free = 1;
+    temp->size = size;
+    new_space->next = temp;
+    new_space->prev = temp->prev;
+    if(temp->prev){
+        temp->prev->next = new_space;
+    }else{
+        head = new_space;
+    }
+    temp->prev = new_space;
+    if(new_space->prev && new_space->prev->free) merge(new_space);
 }
 
-meta_data* merge() {
-    return NULL;
+void merge(meta_data* ptr) {
+    ptr->size += ptr->prev->size + META_SIZE;
+    ptr->prev = ptr->prev->prev;
+    if (ptr->prev) {
+      ptr->prev->next = ptr;
+    }else {
+      head = ptr;
+    }
 }
