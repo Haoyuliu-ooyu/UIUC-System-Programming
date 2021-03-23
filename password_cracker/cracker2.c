@@ -38,10 +38,9 @@ void *crack_func(void* id){
         getSubrange(remain, num_thread, tid, &start_index, &count);
         setStringPosition(password_strt + getPrefixLength(password_strt), start_index);
         v2_print_thread_start(tid, username, start_index, password_strt);
-        long i = 0;
-        for (; i < count; i++){
-            struct crypt_data cdata;
-            cdata.initialized = 0;
+        struct crypt_data cdata;
+        cdata.initialized = 0;
+        for (long i = 0; i < count; i++){
             char *hash_v = crypt_r(password_strt, "xx", &cdata);
             count_temp++;
             //success thread print result, add count and then exit loop
