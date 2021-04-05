@@ -12,6 +12,7 @@
 #include "graph.h"
 #include "parmake.h"
 #include "parser.h"
+#include "queue.h"
 #include "vector.h"
 #include "dictionary.h"
 #include <sys/types.h>
@@ -24,58 +25,87 @@
 
 //variables:
 graph* g = NULL;
+queue* q = NULL;
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+//number of finished thread
 size_t thread_count = 0;
-
 //functions:
 int is_cyclic(void* goal);
 int is_cyclic_helper(void* goal, dictionary* d);
 int check_and_run(void* goal);
 int run_commands(rule_t* curr_rule);
-
+void push_to_queue(char *target, dictionary* d);
+void* par_run(void* ptr);
 // rule_t state specification:
-// -1 fails
-// 1 cycle detected
-// 2 satisfied
+// 0 fails
+// -1 cycle detected
+// -2 satisfied
 
 int parmake(char *makefile, size_t num_threads, char **targets) {
     // good luck!
     //set up
-    thread_count = num_threads;
     g = parser_parse_makefile(makefile, targets);
+    q = queue_create(-1);
+    pthread_t pids[num_threads];
     vector* goals = graph_neighbors(g, "");
-
     //detect cycle
-    int found_cycle = 0;
     for (size_t i = 0; i < vector_size(goals); i++) {
         char* curr = vector_get(goals, i);
-        if (is_cyclic((void*)curr)) {
+        if (is_cyclic((void*)curr) == 1) {
             print_cycle_failure(curr);
             rule_t* curr_rule = (rule_t*) graph_get_vertex_value(g, (void*)curr);
-            curr_rule->state = 1;
-            found_cycle = 1;
+            curr_rule->state = -1;
+            vector_erase(goals, i);
         }
     }
-    //exit if has cycle
-    if (found_cycle) {
-        vector_destroy(goals);
-        graph_destroy(g);
-        return 0;
-    }
     //check and run the commands sequentially; part2;
+    /*
     for (size_t i = 0; i < vector_size(goals); i++) {
         char* curr = vector_get(goals, i);
         rule_t* curr_rule = (rule_t*) graph_get_vertex_value(g, (void*)curr);
-        if (curr_rule->state != 1) {
+        if (curr_rule->state != -1) {
             check_and_run((void*)curr);
         }
     }
-
+    */
+    rule_t *root = graph_get_vertex_value(g, "");
+    root->state = vector_size(goals);
+    if (vector_empty(goals)) {return 0;}
+    //push goals to the queue
+    dictionary* d = string_to_int_dictionary_create();
+    int zero = 0;
+    vector* vertices = graph_vertices(g);
+    VECTOR_FOR_EACH(vertices, curr, {dictionary_set(d, curr, &zero);});
+    vector_destroy(vertices);
+    VECTOR_FOR_EACH(goals, vtx, {push_to_queue(vtx, d);});
+    dictionary_destroy(d);
+    //multi thread set up and calculation
+    for (size_t i = 0; i < num_threads; i++) {
+        pthread_create(pids + i, NULL, par_run, NULL);
+    }
+    pthread_mutex_lock(&m);
+    while (thread_count != vector_size(goals)) {
+        pthread_cond_wait(&cond, &m);
+    }
+    pthread_mutex_unlock(&m);
+    for (size_t i = 0; i < num_threads + 1; i++) {
+        queue_push(q, NULL);
+    }
+    for (size_t i = 0; i < num_threads; i++) {
+        pthread_join(pids[i], NULL);
+    }
     vector_destroy(goals);
     graph_destroy(g);   
+    queue_destroy(q);
+    pthread_cond_destroy(&cond);
+    pthread_mutex_destroy(&m);
 
     return 0;
 }
 
+
+//detect cycles
 int is_cyclic(void* goal) {
     //set up cycle detection
     dictionary* d = string_to_int_dictionary_create();
@@ -122,7 +152,7 @@ int is_cyclic_helper(void* goal, dictionary* d) {
     vector_destroy(neighborhood);
     return 0;
 }
-
+/*
 int check_and_run(void* goal) {
     vector* dependencies = graph_neighbors(g, goal);
     rule_t* curr_rule = (rule_t*) graph_get_vertex_value(g, goal);
@@ -206,4 +236,83 @@ int run_commands(rule_t* curr_rule) {
     }
     curr_rule -> state = 2;
     return 1;
+}
+*/
+
+void push_to_queue(char *target, dictionary* d) {
+    if (*(int*)dictionary_get(d, target) == 1) return;
+    int one = 1;
+    dictionary_set(d, target, &one);
+    vector* dependencies = graph_neighbors(g, target);
+    //push for each item in dependencies
+    VECTOR_FOR_EACH(dependencies, vt, {push_to_queue(vt, d);});
+    if (vector_empty(dependencies)) queue_push(q, target);
+    rule_t *rule = (rule_t *)graph_get_vertex_value(g, target);
+    rule->state = vector_size(dependencies);
+    vector_destroy(dependencies);
+}
+
+void* par_run(void* ptr) {
+    while (1) {
+        char* target = (char*)queue_pull(q);
+        if (!target) {break;}
+        rule_t* rule = (rule_t*)graph_get_vertex_value(g, target);
+        int done = 1;
+        int flag = 0;
+        struct stat stat_inf;
+        if (stat(rule->target, &stat_inf) == -1) {flag = 1;}
+        if (flag == 0) {
+            pthread_mutex_lock(&m);
+            vector* dependencies = graph_neighbors(g, target);
+            pthread_mutex_unlock(&m);
+            VECTOR_FOR_EACH(dependencies, vtx, {
+                rule_t* temp_rule = (rule_t*)graph_get_vertex_value(g, vtx);
+                struct stat stat_temp;
+                if (stat(temp_rule->target, &stat_temp) == -1 || stat_temp.st_mtime > stat_inf.st_mtime) {
+                    flag = 1;
+                    break;
+                }
+            });
+            vector_destroy(dependencies);
+        }
+        if (flag) {
+            VECTOR_FOR_EACH(rule->commands, vtx, {
+                if (system(vtx) != 0) {
+                    done = 0;
+                    break;
+                }
+            });
+        }
+        //
+        pthread_mutex_lock(&m);
+        vector* anti = graph_antineighbors(g, target);
+        /*
+        VECTOR_FOR_EACH(anti, vtx, {
+            if (done) {
+                rule_t* rule_temp = graph_get_vertex_value(g, vtx);
+                rule_temp->state -= 1;
+                if (rule_temp->state = 0) {queue_push(q, vtx);}
+            }
+            if (!strcmp(vtx, "")) {
+                thread_count++;
+                pthread_cond_signal(&cond);
+            }
+        });
+
+        */
+       VECTOR_FOR_EACH(anti, vt, {
+            if (done) {
+                rule_t *rule_temp = graph_get_vertex_value(g, vt);
+                rule_temp->state -= 1;
+                if (rule_temp->state == 0) queue_push(q, vt);
+            }
+            if (!strcmp(vt, "")) {
+                thread_count++;
+                pthread_cond_signal(&cond);
+            }
+        });
+        pthread_mutex_unlock(&m);
+        vector_destroy(anti);
+    }
+    return ptr;
 }
