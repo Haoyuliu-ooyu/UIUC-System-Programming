@@ -57,6 +57,7 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
             rule_t* curr_rule = (rule_t*) graph_get_vertex_value(g, (void*)curr);
             curr_rule->state = -1;
             vector_erase(goals, i);
+            i--;
         }
     }
     //check and run the commands sequentially; part2;
@@ -286,27 +287,13 @@ void* par_run(void* ptr) {
         //
         pthread_mutex_lock(&m);
         vector* anti = graph_antineighbors(g, target);
-        /*
-        VECTOR_FOR_EACH(anti, vtx, {
+       VECTOR_FOR_EACH(anti, vtx, {
             if (done) {
-                rule_t* rule_temp = graph_get_vertex_value(g, vtx);
+                rule_t *rule_temp = graph_get_vertex_value(g, vtx);
                 rule_temp->state -= 1;
-                if (rule_temp->state = 0) {queue_push(q, vtx);}
+                if (rule_temp->state == 0) queue_push(q, vtx);
             }
             if (!strcmp(vtx, "")) {
-                thread_count++;
-                pthread_cond_signal(&cond);
-            }
-        });
-
-        */
-       VECTOR_FOR_EACH(anti, vt, {
-            if (done) {
-                rule_t *rule_temp = graph_get_vertex_value(g, vt);
-                rule_temp->state -= 1;
-                if (rule_temp->state == 0) queue_push(q, vt);
-            }
-            if (!strcmp(vt, "")) {
                 thread_count++;
                 pthread_cond_signal(&cond);
             }
