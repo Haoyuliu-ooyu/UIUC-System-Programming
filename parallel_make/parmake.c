@@ -26,16 +26,17 @@
 //variables:
 graph* g = NULL;
 queue* q = NULL;
+dictionary* d = NULL;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 //number of finished thread
 size_t thread_count = 0;
 //functions:
 int is_cyclic(void* goal);
-int is_cyclic_helper(void* goal, dictionary* d);
+int is_cyclic_helper(void* goal);
 int check_and_run(void* goal);
 int run_commands(rule_t* curr_rule);
-void push_to_queue(char *target, dictionary* d);
+void push_to_queue(char *target);
 void* par_run(void* ptr);
 // rule_t state specification:
 // 0 fails
@@ -45,6 +46,7 @@ void* par_run(void* ptr);
 int parmake(char *makefile, size_t num_threads, char **targets) {
     // good luck!
     //set up
+    d = string_to_int_dictionary_create();
     g = parser_parse_makefile(makefile, targets);
     q = queue_create(-1);
     pthread_t pids[num_threads];
@@ -74,14 +76,13 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     root->state = vector_size(goals);
     if (vector_empty(goals)) {return 0;}
     //push goals to the queue
-    dictionary* d = string_to_int_dictionary_create();
     int zero = 0;
     vector* vertices = graph_vertices(g);
     VECTOR_FOR_EACH(vertices, curr, {dictionary_set(d, curr, &zero);});
     vector_destroy(vertices);
-    VECTOR_FOR_EACH(goals, vtx, {push_to_queue(vtx, d);});
-    dictionary_destroy(d);
+    VECTOR_FOR_EACH(goals, vtx, {push_to_queue(vtx);});
     //multi thread set up and calculation
+    dictionary_destroy(d);
     for (size_t i = 0; i < num_threads; i++) {
         pthread_create(pids + i, NULL, par_run, NULL);
     }
@@ -101,7 +102,6 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     queue_destroy(q);
     pthread_cond_destroy(&cond);
     pthread_mutex_destroy(&m);
-
     return 0;
 }
 
@@ -109,7 +109,6 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
 //detect cycles
 int is_cyclic(void* goal) {
     //set up cycle detection
-    dictionary* d = string_to_int_dictionary_create();
     int zero = 0;
     vector* vertices = graph_vertices(g);
     /*
@@ -120,12 +119,11 @@ int is_cyclic(void* goal) {
     */
    VECTOR_FOR_EACH(vertices, curr, {dictionary_set(d, curr, &zero);});
    vector_destroy(vertices);
-   int exit = is_cyclic_helper(goal, d);
-   dictionary_destroy(d);
+   int exit = is_cyclic_helper(goal);
    return exit;
 }
 
-int is_cyclic_helper(void* goal, dictionary* d) {
+int is_cyclic_helper(void* goal) {
     if (!dictionary_contains(d, goal)) {
         return 0;
     }
@@ -143,7 +141,7 @@ int is_cyclic_helper(void* goal, dictionary* d) {
     vector* neighborhood = graph_neighbors(g, goal);
     for (size_t i = 0; i < vector_size(neighborhood); i++) {
         void* curr = vector_get(neighborhood, i);
-        if (is_cyclic_helper(curr, d) == 1) {
+        if (is_cyclic_helper(curr) == 1) {
             vector_destroy(neighborhood);
             return 1;
         }
@@ -240,13 +238,13 @@ int run_commands(rule_t* curr_rule) {
 }
 */
 
-void push_to_queue(char *target, dictionary* d) {
+void push_to_queue(char *target) {
     if (*(int*)dictionary_get(d, target) == 1) return;
     int one = 1;
     dictionary_set(d, target, &one);
     vector* dependencies = graph_neighbors(g, target);
     //push for each item in dependencies
-    VECTOR_FOR_EACH(dependencies, vt, {push_to_queue(vt, d);});
+    VECTOR_FOR_EACH(dependencies, vt, {push_to_queue(vt);});
     if (vector_empty(dependencies)) queue_push(q, target);
     rule_t *rule = (rule_t *)graph_get_vertex_value(g, target);
     rule->state = vector_size(dependencies);
