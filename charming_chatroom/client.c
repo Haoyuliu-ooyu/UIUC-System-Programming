@@ -1,8 +1,9 @@
 /**
  * charming_chatroom
  * CS 241 - Spring 2021
+ * partner: xinshuo3, peiyuan3
  */
-
+#include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
 #include <pthread.h>
@@ -14,180 +15,244 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "chat_window.h"
 #include "utils.h"
 
-static volatile int serverSocket;
-static pthread_t threads[2];
+#define MAX_CLIENTS 8
 
-void *write_to_server(void *arg);
-void *read_from_server(void *arg);
-void close_program(int signal);
+void *process_client(void *p);
+
+static volatile int serverSocket;
+static volatile int endSession;
+
+static volatile int clientsCount;
+static volatile int clients[MAX_CLIENTS];
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
- * Shuts down connection with 'serverSocket'.
- * Called by close_program upon SIGINT.
+ * Signal handler for SIGINT.
+ * Used to set flag to end server.
  */
-void close_server_connection() {
-    // Your code here
+void close_server() {
+    endSession = 1;
+    // add any additional flags here you want.
+    int i = 0;
+    for (; i < MAX_CLIENTS; i++){
+        if (clients[i] != -1){
+            if (shutdown(clients[i], SHUT_RDWR) != 0){ 
+                perror("no more data");
+            }
+        if (close(clients[i]) != 0)  {
+            perror("close file");
+        }
+      }
+    }
+    if( shutdown(serverSocket, SHUT_RDWR) != 0) {
+        perror("no more data");
+    }
+    if (close(serverSocket) != 0) {
+        perror("close");
+    }
 }
 
 /**
- * Sets up a connection to a chatroom server and returns
- * the file descriptor associated with the connection.
- *
- * host - Server to connect to.
- * port - Port to connect to server on.
- *
- * Returns integer of valid file descriptor, or exit(1) on failure.
+ * Cleanup function called in main after `run_server` exits.
+ * Server ending clean up (such as shutting down clients) should be handled
+ * here.
  */
-int connect_to_server(const char *host, const char *port) {
+void cleanup() {
+    if (shutdown(serverSocket, SHUT_RDWR) != 0) {
+        perror("shutdown():");
+    }
+    close(serverSocket);
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i] != -1) {
+            if (shutdown(clients[i], SHUT_RDWR) != 0) {
+                perror("shutdown(): ");
+            }
+            close(clients[i]);
+        }
+    }
+}
+
+/**
+ * Sets up a server connection.
+ * Does not accept more than MAX_CLIENTS connections.  If more than MAX_CLIENTS
+ * clients attempts to connects, simply shuts down
+ * the new client and continues accepting.
+ * Per client, a thread should be created and 'process_client' should handle
+ * that client.
+ * Makes use of 'endSession', 'clientsCount', 'client', and 'mutex'.
+ *
+ * port - port server will run on.
+ *
+ * If any networking call fails, the appropriate error is printed and the
+ * function calls exit(1):
+ *    - fprtinf to stderr for getaddrinfo
+ *    - perror() for any other call
+ */
+void run_server(char *port) {
+    struct addrinfo info;
+    memset(&info, 0, sizeof(struct addrinfo));
+    info.ai_family = AF_INET;
+    info.ai_socktype = SOCK_STREAM;
+    info.ai_flags = AI_PASSIVE;
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == -1) {
+        perror("not workin");
+        exit(1);
+    }
+
+    struct addrinfo *r;
+    int temp = getaddrinfo(NULL, port, &info, &r);
+    if(temp){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(temp));
+        exit(1);
+    }
+    int o = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEPORT, &o, sizeof(o)) == -1) {
+        perror("setsockopt failed");
+        exit(1);
+    }
+    if (bind(serverSocket, r->ai_addr, r->ai_addrlen)) {
+        perror("bind failed");
+        exit(1);
+    }
+    if (listen(serverSocket, MAX_CLIENTS)) {
+        perror("listen failed");
+        exit(1);
+    }
+    int i = 0;
+    for(; i < MAX_CLIENTS; i++){
+        clients[i] = -1;
+    }
+    pthread_t threads[MAX_CLIENTS];
+    while( !endSession ) {
+        if (clientsCount > MAX_CLIENTS) {
+            continue;
+        }
+        struct sockaddr addr;
+        memset(&addr, 0, sizeof(struct sockaddr));
+        socklen_t len = sizeof(struct sockaddr);
+        int fd_addr = accept(serverSocket, &addr, &len);
+        if (fd_addr < 0) {
+            perror("accept failed");
+            exit(1);
+        }
+        i = 0;
+        intptr_t id_c = -1;
+        for (; i < MAX_CLIENTS; i++) {
+            if (clients[i] == -1) {
+                clients[i] = fd_addr;
+                char ip_addr[INET_ADDRSTRLEN];
+                if(inet_ntop(AF_INET, &addr, ip_addr, len)) {
+                    printf("Client %d joined %s\n", i, ip_addr);
+                }
+                id_c = i;
+                break;
+            }
+        }
+        if (id_c != -1) {
+            clientsCount ++;
+        }
+        if (pthread_create(&threads[id_c], NULL, process_client, (void*)id_c)) {
+            perror("thread create failed");
+            exit(1);
+        }
+    }
+    freeaddrinfo(r);
+
     /*QUESTION 1*/
     /*QUESTION 2*/
     /*QUESTION 3*/
 
+    /*QUESTION 8*/
+
     /*QUESTION 4*/
     /*QUESTION 5*/
-
     /*QUESTION 6*/
 
-    /*QUESTION 7*/
-    return -1;
-}
+    /*QUESTION 9*/
 
-typedef struct _thread_cancel_args {
-    char **buffer;
-    char **msg;
-} thread_cancel_args;
-
-/**
- * Cleanup routine in case the thread gets cancelled.
- * Ensure buffers are freed if they point to valid memory.
- */
-void thread_cancellation_handler(void *arg) {
-    printf("Cancellation handler\n");
-    thread_cancel_args *a = (thread_cancel_args *)arg;
-    char **msg = a->msg;
-    char **buffer = a->buffer;
-    if (*buffer) {
-        free(*buffer);
-        *buffer = NULL;
-    }
-    if (msg && *msg) {
-        free(*msg);
-        *msg = NULL;
-    }
+    /*QUESTION 10*/
 }
 
 /**
- * Reads bytes from user and writes them to server.
+ * Broadcasts the message to all connected clients.
  *
- * arg - void* casting of char* that is the username of client.
+ * message  - the message to send to all clients.
+ * size     - length in bytes of message to send.
  */
-void *write_to_server(void *arg) {
-    char *name = (char *)arg;
-    char *buffer = NULL;
-    char *msg = NULL;
-    ssize_t retval = 1;
-
-    thread_cancel_args cancel_args;
-    cancel_args.buffer = &buffer;
-    cancel_args.msg = &msg;
-    // Setup thread cancellation handlers.
-    // Read up on pthread_cancel, thread cancellation states,
-    // pthread_cleanup_push for more!
-    pthread_cleanup_push(thread_cancellation_handler, &cancel_args);
-
-    while (retval > 0) {
-        read_message_from_screen(&buffer);
-        if (buffer == NULL)
-            break;
-
-        msg = create_message(name, buffer);
-        size_t len = strlen(msg) + 1;
-
-        retval = write_message_size(len, serverSocket);
-        if (retval > 0)
-            retval = write_all_to_socket(serverSocket, msg, len);
-
-        free(msg);
-        msg = NULL;
+void write_to_clients(const char *message, size_t size) {
+    pthread_mutex_lock(&mutex);
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i] != -1) {
+            ssize_t retval = write_message_size(size, clients[i]);
+            if (retval > 0) {
+                retval = write_all_to_socket(clients[i], message, size);
+            }
+            if (retval == -1) {
+                perror("write(): ");
+            }
+        }
     }
-
-    pthread_cleanup_pop(0);
-    return 0;
+    pthread_mutex_unlock(&mutex);
 }
 
 /**
- * Reads bytes from the server and prints them to the user.
+ * Handles the reading to and writing from clients.
  *
- * arg - void* requriment for pthread_create function.
+ * p  - (void*)intptr_t index where clients[(intptr_t)p] is the file descriptor
+ * for this client.
+ *
+ * Return value not used.
  */
-void *read_from_server(void *arg) {
-    // Silence the unused parameter warning.
-    (void)arg;
+void *process_client(void *p) {
+    pthread_detach(pthread_self());
+    intptr_t clientId = (intptr_t)p;
     ssize_t retval = 1;
     char *buffer = NULL;
-    thread_cancel_args cancellation_args;
-    cancellation_args.buffer = &buffer;
-    cancellation_args.msg = NULL;
-    pthread_cleanup_push(thread_cancellation_handler, &cancellation_args);
 
-    while (retval > 0) {
-        retval = get_message_size(serverSocket);
+    while (retval > 0 && endSession == 0) {
+        retval = get_message_size(clients[clientId]);
         if (retval > 0) {
             buffer = calloc(1, retval);
-            retval = read_all_from_socket(serverSocket, buffer, retval);
+            retval = read_all_from_socket(clients[clientId], buffer, retval);
         }
         if (retval > 0)
-            write_message_to_screen("%s\n", buffer);
+            write_to_clients(buffer, retval);
 
         free(buffer);
         buffer = NULL;
     }
 
-    pthread_cleanup_pop(0);
-    return 0;
-}
+    printf("User %d left\n", (int)clientId);
+    close(clients[clientId]);
 
-/**
- * Signal handler used to close this client program.
- */
-void close_program(int signal) {
-    if (signal == SIGINT) {
-        pthread_cancel(threads[0]);
-        pthread_cancel(threads[1]);
-        close_chat();
-        close_server_connection();
-    }
+    pthread_mutex_lock(&mutex);
+    clients[clientId] = -1;
+    clientsCount--;
+    pthread_mutex_unlock(&mutex);
+
+    return NULL;
 }
 
 int main(int argc, char **argv) {
-    if (argc < 4 || argc > 5) {
-        fprintf(stderr, "Usage: %s <address> <port> <username> [output_file]\n",
-                argv[0]);
-        exit(1);
+    if (argc != 2) {
+        fprintf(stderr, "%s <port>\n", argv[0]);
+        return -1;
     }
 
-    char *output_filename;
-    if (argc == 5) {
-        output_filename = argv[4];
-    } else {
-        output_filename = NULL;
+    struct sigaction act;
+    memset(&act, '\0', sizeof(act));
+    act.sa_handler = close_server;
+    if (sigaction(SIGINT, &act, NULL) < 0) {
+        perror("sigaction");
+        return 1;
     }
 
-    // Setup signal handler.
-    signal(SIGINT, close_program);
-    create_windows(output_filename);
-    atexit(destroy_windows);
-
-    serverSocket = connect_to_server(argv[1], argv[2]);
-
-    pthread_create(&threads[0], NULL, write_to_server, (void *)argv[3]);
-    pthread_create(&threads[1], NULL, read_from_server, NULL);
-
-    pthread_join(threads[0], NULL);
-    pthread_join(threads[1], NULL);
-
-    return 0;
+    run_server(argv[1]);
+    cleanup();
+    pthread_exit(NULL);
 }
