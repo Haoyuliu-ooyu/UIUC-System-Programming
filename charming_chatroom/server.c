@@ -1,6 +1,7 @@
 /**
  * charming_chatroom
  * CS 241 - Spring 2021
+ * partner: peiyuan3, xinshuo3
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -35,6 +36,23 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 void close_server() {
     endSession = 1;
     // add any additional flags here you want.
+    int i = 0;
+    for (; i < MAX_CLIENTS; i++){
+        if (clients[i] != -1){
+            if (shutdown(clients[i], SHUT_RDWR) != 0){ 
+                perror("no more data");
+            }
+        if (close(clients[i]) != 0)  {
+            perror("close file");
+        }
+      }
+    }
+    if( shutdown(serverSocket, SHUT_RDWR) != 0) {
+        perror("no more data");
+    }
+    if (close(serverSocket) != 0) {
+        perror("close");
+    }
 }
 
 /**
@@ -75,6 +93,76 @@ void cleanup() {
  *    - perror() for any other call
  */
 void run_server(char *port) {
+    struct addrinfo info;
+    memset(&info, 0, sizeof(struct addrinfo));
+    info.ai_family = AF_INET;
+    info.ai_socktype = SOCK_STREAM;
+    info.ai_flags = AI_PASSIVE;
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == -1) {
+        perror("not workin");
+        exit(1);
+    }
+
+    struct addrinfo *r;
+    int temp = getaddrinfo(NULL, port, &info, &r);
+    if(temp){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(temp));
+        exit(1);
+    }
+    int o = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEPORT, &o, sizeof(o)) == -1) {
+        perror("setsockopt failed");
+        exit(1);
+    }
+    if (bind(serverSocket, r->ai_addr, r->ai_addrlen)) {
+        perror("bind failed");
+        exit(1);
+    }
+    if (listen(serverSocket, MAX_CLIENTS)) {
+        perror("listen failed");
+        exit(1);
+    }
+    int i = 0;
+    for(; i < MAX_CLIENTS; i++){
+        clients[i] = -1;
+    }
+    pthread_t threads[MAX_CLIENTS];
+    while( !endSession ) {
+        if (clientsCount > MAX_CLIENTS) {
+            continue;
+        }
+        struct sockaddr addr;
+        memset(&addr, 0, sizeof(struct sockaddr));
+        socklen_t len = sizeof(struct sockaddr);
+        int fd_addr = accept(serverSocket, &addr, &len);
+        if (fd_addr < 0) {
+            perror("accept failed");
+            exit(1);
+        }
+        i = 0;
+        intptr_t id_c = -1;
+        for (; i < MAX_CLIENTS; i++) {
+            if (clients[i] == -1) {
+                clients[i] = fd_addr;
+                char ip_addr[INET_ADDRSTRLEN];
+                if(inet_ntop(AF_INET, &addr, ip_addr, len)) {
+                    printf("Client %d joined %s\n", i, ip_addr);
+                }
+                id_c = i;
+                break;
+            }
+        }
+        if (id_c != -1) {
+            clientsCount ++;
+        }
+        if (pthread_create(&threads[id_c], NULL, process_client, (void*)id_c)) {
+            perror("thread create failed");
+            exit(1);
+        }
+    }
+    freeaddrinfo(r);
+
     /*QUESTION 1*/
     /*QUESTION 2*/
     /*QUESTION 3*/
