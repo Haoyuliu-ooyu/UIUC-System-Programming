@@ -1,5 +1,6 @@
 /**
  * charming_chatroom
+ * partner: peiyuan3, xinshuo3
  * CS 241 - Spring 2021
  */
 #include <arpa/inet.h>
