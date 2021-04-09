@@ -1,7 +1,8 @@
 /**
  * charming_chatroom
  * CS 241 - Spring 2021
- * partner: peiyuan3, xinshuo3
+  partner: peiyuan3, xinshuo3
+
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -129,36 +130,24 @@ void run_server(char *port) {
     }
     pthread_t threads[MAX_CLIENTS];
     while( !endSession ) {
+        pthread_mutex_lock(&mutex);
         if (clientsCount > MAX_CLIENTS) {
+            pthread_mutex_unlock(&mutex);
             continue;
         }
-        struct sockaddr addr;
-        memset(&addr, 0, sizeof(struct sockaddr));
-        socklen_t len = sizeof(struct sockaddr);
-        int fd_addr = accept(serverSocket, &addr, &len);
-        if (fd_addr < 0) {
+        int fd_addr = accept(serverSocket, NULL, NULL);
+        if (fd_addr == -1) {
             perror("accept failed");
             exit(1);
         }
         i = 0;
-        intptr_t id_c = -1;
         for (; i < MAX_CLIENTS; i++) {
             if (clients[i] == -1) {
                 clients[i] = fd_addr;
-                char ip_addr[INET_ADDRSTRLEN];
-                if(inet_ntop(AF_INET, &addr, ip_addr, len)) {
-                    printf("Client %d joined %s\n", i, ip_addr);
-                }
-                id_c = i;
+                clientsCount ++;
+                pthread_create(threads+i, NULL, process_client, (void*)(intptr_t)i);
                 break;
             }
-        }
-        if (id_c != -1) {
-            clientsCount ++;
-        }
-        if (pthread_create(&threads[id_c], NULL, process_client, (void*)id_c)) {
-            perror("thread create failed");
-            exit(1);
         }
     }
     freeaddrinfo(r);
