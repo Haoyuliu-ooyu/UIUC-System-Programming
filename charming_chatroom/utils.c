@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
 
 #include "utils.h"
 static const size_t MESSAGE_SIZE_DIGITS = 4;
@@ -32,15 +34,46 @@ ssize_t get_message_size(int socket) {
 // You may assume size won't be larger than a 4 byte integer
 ssize_t write_message_size(size_t size, int socket) {
     // Your code here
-    return 9001;
+    ssize_t fixed_size = htonl(size);
+    return write_all_to_socket(socket, (char*)&fixed_size , MESSAGE_SIZE_DIGITS);
 }
 
 ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
     // Your Code Here
-    return 9001;
+    ssize_t word_cunt = count;
+    ssize_t total = 0;
+    while (word_cunt > 0) {
+        ssize_t result = read(socket, buffer + total, word_cunt);
+        if (result > 0) {
+            total += result;
+            word_cunt -= result;
+        }
+        if (result == -1 && errno != EINTR) {
+            break;
+        }
+        if (result == 0) {
+            return 0;
+        }
+    }
+    return count;
 }
 
 ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
     // Your Code Here
-    return 9001;
+    ssize_t word_cunt = count;
+    ssize_t total = 0;
+    while (word_cunt > 0) {
+        ssize_t result = write(socket, buffer + total, word_cunt);
+        if (result > 0) {
+            total += result;
+            word_cunt -= result;
+        }
+        if (result == -1 && errno != EINTR) {
+            break;
+        }
+        if (result == 0) {
+            return 0;
+        }
+    }
+    return count;
 }
