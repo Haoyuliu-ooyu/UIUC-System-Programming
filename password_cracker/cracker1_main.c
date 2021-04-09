@@ -20,7 +20,7 @@ void usage() {
 
 int main(int argc, char **argv) {
     size_t thread_count = DEFAULT_THREADS;
-    if (argc != 3) {
+    if (argc != 2) {
         usage();
     }
 
