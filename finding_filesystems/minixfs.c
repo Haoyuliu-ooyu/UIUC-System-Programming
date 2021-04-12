@@ -44,7 +44,7 @@ int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
     // Thar she blows!
     inode* i = get_inode(fs, path);
     if (!i) {
-        errno = ENONET;
+        errno = ENOENT; 
         return -1;
     }
     uint16_t temp = i->mode >> RWX_BITS_NUMBER;
@@ -55,19 +55,23 @@ int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
 
 int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
     // Land ahoy!
-    inode* i = get_inode(fs, path);
-    if (i != NULL) {
-        if (owner != (uid_t) -1) {
-            i->uid = owner;
-        }
-        if (group != (gid_t) -1) {
-            i->gid = group;
-        }
-        clock_gettime(CLOCK_REALTIME, &(i->ctim));
-        return 0;
+    inode *i = get_inode(fs, path);
+    //node dont  exit
+    if (!i) {
+        errno = ENOENT; 
+        return -1;
     }
-    errno = ENONET;
-    return -1;
+    //change user
+    if (owner != ((uid_t)-1)){
+        i->uid = owner;
+    }
+    //change group
+    if (group != ((gid_t)-1)){
+        i->gid = group;
+    }
+     //update meta time
+    clock_gettime(CLOCK_REALTIME, &(i->ctim));
+    return 0;
 }
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
@@ -150,6 +154,13 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
     }
     //
     inode* target = get_inode(fs, path);
+    if (!target) {
+        target = minixfs_create_inode_for_path(fs, path);
+        if (target == NULL) {
+            errno = ENOSPC;
+            return -1;
+        }
+    }
     uint64_t index = *off / sizeof(data_block);
     size_t offset = *off % sizeof(data_block);
     uint64_t size = 0;
