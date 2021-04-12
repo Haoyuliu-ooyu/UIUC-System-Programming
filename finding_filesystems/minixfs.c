@@ -226,7 +226,7 @@ ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
             size = count - temp_count;
         }
         mem_block = get_block(fs, target, index);
-        memcpy(mem_block, buf + temp_count, size);
+        memcpy(buf + temp_count, mem_block, size);
         temp_count += size;
         *off += size;
         index ++;
