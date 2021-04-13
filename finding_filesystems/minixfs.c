@@ -76,11 +76,10 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
     // Land ahoy!
-    if (valid_filename(path) == 1) {
+    if (valid_filename(path) != 1) {
         return NULL;
     }
-    inode* i = get_inode(fs, path);
-    if (i) {
+    if (get_inode(fs, path)) {
         //clock_gettime(CLOCK_REALTIME, &(i->ctim));
         return NULL;
     }
@@ -140,6 +139,14 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
 ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
                       size_t count, off_t *off) {
     // X marks the spot
+    inode* target = get_inode(fs, path);
+    if (target == NULL) {
+        target = minixfs_create_inode_for_path(fs, path);
+        if (target == NULL) {
+            errno = ENOSPC;
+            return -1;
+        }
+    }
     uint64_t maxi = sizeof(data_block) * (NUM_DIRECT_BLOCKS + NUM_INDIRECT_BLOCKS);
     //
     if (count + *off > maxi) {
@@ -153,14 +160,6 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
         return -1;
     }
     //
-    inode* target = get_inode(fs, path);
-    if (!target) {
-        target = minixfs_create_inode_for_path(fs, path);
-        if (target == NULL) {
-            errno = ENOSPC;
-            return -1;
-        }
-    }
     uint64_t index = *off / sizeof(data_block);
     size_t offset = *off % sizeof(data_block);
     uint64_t size = 0;
