@@ -76,12 +76,12 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
     // Land ahoy!
-    if (!valid_filename(path)) {
-        return NULL;
-    }
     inode* i = get_inode(fs, path);
     if (i) {
         //clock_gettime(CLOCK_REALTIME, &(i->ctim));
+        return NULL;
+    }
+    if (valid_filename(path) == 1) {
         return NULL;
     }
     const char* file_name = NULL;
