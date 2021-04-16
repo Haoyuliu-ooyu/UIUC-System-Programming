@@ -1,7 +1,6 @@
 /**
  * deepfried_dd
  * CS 241 - Spring 2021
- * partner: xinshuo3, peiyuan3
  */
 #include "format.h"
 #include <unistd.h>
@@ -22,12 +21,12 @@ void signal_handler(int sig) {
 int main(int argc, char **argv) {
     signal(SIGUSR1, signal_handler);
     int opt = 0;
-    FILE* fp_in;
-    FILE* fp_out;
+    FILE* fp_in = stdin;
+    FILE* fp_out = stdout;
     long num_block_skip_in = 0;
     long num_block_skip_out = 0;
     long num_block_copy = 0;
-    long block_size = 0;
+    long block_size = 512;
     while((opt = getopt(argc, argv, "i:o:b:c:p:k:")) != -1) {
         switch(opt) {
             case 'i':
@@ -41,9 +40,6 @@ int main(int argc, char **argv) {
                 if (getline(&linptr, &i, fp_in) != -1) {
                     puts(linptr); //print the line 
                 }*/
-
-                
-                fclose(fp_in);
                 continue;
             case 'o':
                 fp_out = fopen(optarg, "w+");
@@ -74,18 +70,16 @@ int main(int argc, char **argv) {
         }
     }
     fseek(fp_in, num_block_skip_in, SEEK_SET);
-    long start = ftell(fp_in);
-    fseek(fp_in, 0, SEEK_END);
-    long end = ftell(fp_in);
-    long file_size = end - start;
-    fseek(fp_in, num_block_skip_in, SEEK_SET);
     fseek(fp_out, num_block_skip_out, SEEK_SET);
     clock_t before = clock();
     size_t full_blocks_in = 0;
     size_t partial_blocks_in = 0;
     size_t copy_size = 0;
-    while (!feof(fp_in)) {
-        if (partial_blocks_in + full_blocks_in == (unsigned long) num_block_copy) {
+    while (1) {
+        if (feof(fp_in)) {
+            break;
+        }
+        if (num_block_copy != 0 && partial_blocks_in + full_blocks_in == (unsigned long) num_block_copy) {
             break;
         }
         if (print_stat) {
@@ -96,29 +90,31 @@ int main(int argc, char **argv) {
             print_status_report(full_blocks_in, partial_blocks_in,
                         full_blocks_in, partial_blocks_in,
                         copy_size, time_elapsed_);
+            print_stat = 0;
         }
         char buffer[block_size];
-        if (fread((void*) buffer, block_size, 1, fp_in) == 1) {
+        size_t num_read = fread((void*) buffer, 1, block_size, fp_in);
+        if (num_read == 0) {
+            break;
+        }
+        if (num_read >= (unsigned long) block_size) {
+            fflush(stdin);
             fwrite((void*) buffer, block_size, 1, fp_out);
             full_blocks_in++;
             copy_size += block_size;
         } else {
             partial_blocks_in++;
-            fwrite((void*) buffer, end - ftell(fp_in), 1, fp_out);
-            copy_size += end - ftell(fp_in);
+            copy_size += num_read;
+            fwrite((void*) buffer, num_read, 1, fp_out);
         }
-        
-        fseek(fp_in, block_size, SEEK_CUR);
-        fseek(fp_out, block_size, SEEK_CUR);
         
     }
     clock_t diff = clock() - before;
-    double time_elapsed = 1000* diff / CLOCKS_PER_SEC;
+    long double time_elapsed = 1000* diff / CLOCKS_PER_SEC;
     time_elapsed /= 1000;
-
     //size_t total_bytes_copied = block_size * num_block_copy;
     print_status_report(full_blocks_in, partial_blocks_in,
                         full_blocks_in, partial_blocks_in,
-                        file_size, time_elapsed);
+                        copy_size, time_elapsed);
     return 0;
 }
