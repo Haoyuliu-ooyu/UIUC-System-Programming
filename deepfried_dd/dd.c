@@ -1,6 +1,7 @@
 /**
  * deepfried_dd
  * CS 241 - Spring 2021
+ * partner: xinshuo3, peiyuan3
  */
 #include "format.h"
 #include <unistd.h>
