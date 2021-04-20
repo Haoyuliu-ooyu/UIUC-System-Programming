@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
     if (status2 != 0) {
         perror("shutdown");
     }
-    //read response from server
+    //read response from server()
     char* ok = "OK\n";
     char* err = "ERROR\n";
     char* res = calloc(1, strlen(ok)+1);
