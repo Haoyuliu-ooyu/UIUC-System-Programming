@@ -20,8 +20,6 @@
 char **parse_args(int argc, char **argv);
 verb check_args(char **args);
 
-void read_response_from_server(char**args, int socket, verb method);
-
 int main(int argc, char **argv) {
     // Good luck!
     char** args = parse_args(argc, argv);
@@ -104,18 +102,11 @@ int main(int argc, char **argv) {
     if (status2 != 0) {
         perror("shutdown");
     }
-    read_response_from_server(args, sockt_file_descriptor, method);
-    shutdown(sockt_file_descriptor, SHUT_WR);
-    
-    close(sockt_file_descriptor);
-    free(args);
-}
-
-void read_response_from_server(char**args, int socket, verb method) {
+    //read response from server
     char* ok = "OK\n";
     char* err = "ERROR\n";
     char* res = calloc(1, strlen(ok)+1);
-    size_t read_byte = read_from_socket(socket, res, strlen(ok));
+    size_t read_byte = read_from_socket(sockt_file_descriptor, res, strlen(ok));
     if (strcmp(res, ok) == 0) {
         fprintf(stdout, "%s", res);
         //delete or put response ok
@@ -129,7 +120,7 @@ void read_response_from_server(char**args, int socket, verb method) {
                 exit(-1);
             }
             size_t size;
-            read_from_socket(socket, (char*)&size, sizeof(size_t));
+            read_from_socket(sockt_file_descriptor, (char*)&size, sizeof(size_t));
             size_t rtotal = 0;
             size_t r_size;
             while (rtotal < size+5) {
@@ -139,7 +130,7 @@ void read_response_from_server(char**args, int socket, verb method) {
                     r_size = size+5-rtotal;
                 }
                 char buffer[1025] = {0};
-                size_t count = read_from_socket(socket, buffer, r_size);
+                size_t count = read_from_socket(sockt_file_descriptor, buffer, r_size);
                 fwrite(buffer, 1, count, local);
                 rtotal += count;
                 if (count == 0) {break;}
@@ -159,10 +150,10 @@ void read_response_from_server(char**args, int socket, verb method) {
         //when method is list   
         if (method == LIST) {
             size_t size;
-            read_from_socket(socket, (char*)&size, sizeof(size_t));
+            read_from_socket(sockt_file_descriptor, (char*)&size, sizeof(size_t));
             char buffer[size+6];
             memset(buffer, 0, size+6);
-            read_byte = read_from_socket(socket, buffer, size+5);
+            read_byte = read_from_socket(sockt_file_descriptor, buffer, size+5);
             //error occurs
             if (read_byte == 0 && read_byte != size) {
                 print_connection_closed();
@@ -178,11 +169,11 @@ void read_response_from_server(char**args, int socket, verb method) {
         }
     } else {
         res = realloc(res, strlen(err)+1);
-        read_from_socket(socket, res+read_byte, strlen(err) - read_byte);
+        read_from_socket(sockt_file_descriptor, res+read_byte, strlen(err) - read_byte);
         if (strcmp(res, err) == 0) {
             fprintf(stdout, "%s", res);
             char err_message[20] = {0};
-            if (!read_from_socket(socket,err_message, 20)) {
+            if (!read_from_socket(sockt_file_descriptor,err_message, 20)) {
                 print_connection_closed();
             }
             print_error_message(err_message);
@@ -191,6 +182,10 @@ void read_response_from_server(char**args, int socket, verb method) {
         }
     }
     free(res);
+    //
+    shutdown(sockt_file_descriptor, SHUT_WR);
+    close(sockt_file_descriptor);
+    free(args);
 }
 
 /**
