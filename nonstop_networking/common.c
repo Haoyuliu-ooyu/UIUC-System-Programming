@@ -51,3 +51,38 @@ ssize_t write_to_socket(int socket, const char *buffer, size_t count) {
     }
     return w_count;
 }
+
+size_t read_head(int socket, char* buffer, size_t count) {
+  size_t r_count = 0;
+  while (r_count < count) {
+    ssize_t ret = read(socket, buffer + r_count, 1);
+    if (ret == 0 || buffer[strlen(buffer) - 1] == '\n') {
+      break;
+    }
+    if (ret == -1) {
+      if (errno == EINTR) {
+        continue;
+      } else {
+        perror("read_head()");
+      }
+    }
+    r_count += ret;
+  }
+  return r_count;
+}
+
+int err_detect(size_t s1, size_t s2) {
+  if (s1 == 0 && s1 != s2) {
+    print_connection_closed();
+    return 1;
+  }
+  if (s1 < s2) {
+    print_too_little_data();
+    return 1;
+  }
+  if (s1 > s2) {
+    print_received_too_much_data();
+    return 1;
+  }
+  return 0;
+}
