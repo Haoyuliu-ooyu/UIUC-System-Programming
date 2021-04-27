@@ -234,8 +234,34 @@ void epoll_mod(int client_file_descriptor) {
 }
 
 void process_method(int client_file_descriptor, C_info *info) {
-  //GET 
-	if (info->method == GET) {
+  
+  // DELETE
+    if (info->method == DELETE) {
+		int len = strlen(dir_) + strlen(info->filename) + 2;
+		char path[len];
+		memset(path, 0, len);
+		sprintf(path, "%s/%s", dir_, info->filename);
+		if (remove(path) < 0) {
+			info->status = -3;
+			return;
+		}
+		size_t i = 0;
+		VECTOR_FOR_EACH(file_vector, name, {
+	        if (!strcmp((char *) name, info->filename)) {
+                break;
+            }
+			i++;
+	 	});
+		size_t v_size= vector_size(file_vector);
+		if (i == v_size) {
+			info->status = -3;
+			return;
+		}
+		vector_erase(file_vector, i);
+		dictionary_remove(file_size, info->filename);
+		write_to_socket(client_file_descriptor, "OK\n", 3);
+        //GET 
+    } else if (info->method == GET) {
 		int len = strlen(dir_) + strlen(info->filename) + 1;
 		char path[len];
 		memset(path, 0, len);
@@ -266,29 +292,6 @@ void process_method(int client_file_descriptor, C_info *info) {
     // PUT
 	} else if (info->method == PUT) {
 		write_to_socket(client_file_descriptor, "OK\n", 3);
-    // DELETE
-	} else if (info->method == DELETE) {
-		int len = strlen(dir_) + strlen(info->filename) + 2;
-		char path[len];
-		memset(path, 0, len);
-		sprintf(path, "%s/%s", dir_, info->filename);
-		if (remove(path) < 0) {
-			info->status = -3;
-			return;
-		}
-		size_t i = 0;
-		VECTOR_FOR_EACH(file_vector, name, {
-	        if (!strcmp((char *) name, info->filename)) break;
-			i++;
-	 	});
-		size_t v_size= vector_size(file_vector);
-		if (i == v_size) {
-			info->status = -3;
-			return;
-		}
-		vector_erase(file_vector, i);
-		dictionary_remove(file_size, info->filename);
-		write_to_socket(client_file_descriptor, "OK\n", 3);
     // LIST
 	} else if (info->method == LIST) {
 		write_to_socket(client_file_descriptor, "OK\n", 3);
@@ -296,11 +299,15 @@ void process_method(int client_file_descriptor, C_info *info) {
 		VECTOR_FOR_EACH(file_vector, i, {
 	         size += strlen(i)+1;
 	    });
-		if (size) size--;
+		if (size) {
+            size--;
+        }
 		write_to_socket(client_file_descriptor, (char*)& size, sizeof(size_t));
 		VECTOR_FOR_EACH(file_vector, i, {
 		        write_to_socket(client_file_descriptor, i, strlen(i));
-				if (_it != _iend-1) write_to_socket(client_file_descriptor, "\n", 1);
+				if (_it != _iend-1) {
+                    write_to_socket(client_file_descriptor, "\n", 1);
+                }
 		});
 	}
 	epoll_ctl(epoll_file_descriptor, EPOLL_CTL_DEL, client_file_descriptor, NULL);
