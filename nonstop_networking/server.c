@@ -44,6 +44,8 @@ void read_header(int, C_info*);
 void run_client(int);
 void shutdown_server();
 void init_server(char*);
+size_t read_head(int socket, char *buffer, size_t count);
+int err_detect(size_t s1, size_t s2);
 
 int main(int argc, char **argv) {
     // good luck!
@@ -89,71 +91,72 @@ void shutdown_server() {
 void init_server(char* port) {
     //create server
     int socket_file_descriptor = socket(AF_INET, SOCK_STREAM, 0);
-    struct addrinfo hints, *result;
+	struct addrinfo hints, *result;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;       
 	hints.ai_socktype = SOCK_STREAM; 
-	hints.ai_flags = AI_PASSIVE;
+	hints.ai_flags = AI_PASSIVE;  
     
     int s = getaddrinfo(NULL, port, &hints, &result);
-    if (s != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		exit(1);
+	}
+	int optval = 1;
+	//reuesed socket
+	if ( setsockopt(socket_file_descriptor, SOL_SOCKET,  SO_REUSEADDR, &optval, sizeof(optval))) {
+    	perror("setsockeopt");
         exit(1);
-    } 
-    int optval = 1;
-    //reused socket
-    if (setsockopt(socket_file_descriptor, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))) {
-        perror("setsockopt");
+	}
+    if ( setsockopt(socket_file_descriptor, SOL_SOCKET,  SO_REUSEPORT, &optval, sizeof(optval))) {
+    	perror("setsockeopt");
         exit(1);
-    }
-    if (bind(socket_file_descriptor, result->ai_addr, result->ai_addrlen) != 0) {
-        perror("bind");
+	}
+	if ( bind(socket_file_descriptor, result->ai_addr, result->ai_addrlen) != 0 ) {
+    	perror("bind");
         exit(1);
-    }
-    if (listen(socket_file_descriptor, 100) != 0) {
-        perror("listen");
+	}
+	if ( listen(socket_file_descriptor, 100) != 0 ) {
+    	perror("listen");
         exit(1);
-    }
-    freeaddrinfo(result);
+	}
+  	freeaddrinfo(result);
 
     //create epoll
-    epoll_file_descriptor = epoll_create(50);
-    if (epoll_file_descriptor == -1) {
+	epoll_file_descriptor = epoll_create(50);
+	if (epoll_file_descriptor == -1) {
         perror("epoll_create");
         exit(1);
-    }
-    struct epoll_event e;
-    e.events = EPOLLIN;
-    e.data.fd = socket_file_descriptor;
-    epoll_ctl(epoll_file_descriptor, EPOLL_CTL_ADD, socket_file_descriptor, &e);
-    struct epoll_event epoll_arr[100];
-    while (1) {
-        int num_events = epoll_wait(epoll_file_descriptor, epoll_arr, 100, 10000);
-        if (num_events == -1) {
-            exit(1);
-        }
-        if (num_events == 0) {
-            continue;
-        }
-        for (int i = 0; i < num_events; i++) {
-            if (epoll_arr[i].data.fd == socket_file_descriptor) {
-                int client_file_descriptor=  accept(socket_file_descriptor, NULL, NULL);
-                if (client_file_descriptor < 0) {
+    };
+  	//server epoll event  with socket fd
+	struct epoll_event eve;
+  	eve.events = EPOLLIN;
+  	eve.data.fd = socket_file_descriptor;
+	epoll_ctl(epoll_file_descriptor, EPOLL_CTL_ADD, socket_file_descriptor, &eve);
+	struct epoll_event epoll_arr[100];
+	while (1) {
+		int num_events = epoll_wait(epoll_file_descriptor, epoll_arr, 100, 10000);
+		if (num_events == -1) exit(1);
+		if (num_events == 0) continue;
+		for (int i = 0; i < num_events; i++) {
+			if (epoll_arr[i].data.fd == socket_file_descriptor) {
+				int client_file_descriptor = accept(socket_file_descriptor, NULL, NULL);
+				if (client_file_descriptor < 0) {
                     perror("accept");
                     exit(1);
-                    //client epoll event
-                    struct epoll_event e2;
-                    e2.events = EPOLLIN;
-                    e2.data.fd = client_file_descriptor;
-                    epoll_ctl(epoll_file_descriptor, EPOLL_CTL_ADD, client_file_descriptor, &e2);
-                    C_info* client_info = calloc(1, sizeof(C_info));
-                    dictionary_set(client_dictionary, &client_file_descriptor, client_info);
-                } else {
-                    run_client(epoll_arr[i].data.fd);
                 }
-            }
-        }
-    }
+        		//client epoll event with client fd
+				struct epoll_event eve2;
+        		eve2.events = EPOLLIN;
+        		eve2.data.fd = client_file_descriptor;
+				epoll_ctl(epoll_file_descriptor, EPOLL_CTL_ADD, client_file_descriptor, &eve2);
+				C_info *client_info = calloc(1, sizeof(C_info));
+        		dictionary_set(client_dictionary, &client_file_descriptor, client_info);
+			} else {
+				run_client(epoll_arr[i].data.fd);
+			}
+		}
+	}
 }
 
 void run_client(int client_file_descriptor) {
@@ -219,7 +222,7 @@ void read_header(int client_file_descriptor, C_info *info) {
         epoll_mod(client_file_descriptor);
         return;
     }
-    info->status = -1;
+    info->status = 1;
     epoll_mod(client_file_descriptor);
 }
 
@@ -350,4 +353,37 @@ int read_PUT_info(int client_file_descriptor, C_info *info) {
 	}
 	dictionary_set(file_size, info->filename, &size);
 	return 0;
+}
+
+size_t read_head(int socket, char *buffer, size_t count) {
+	size_t r_count = 0;
+	while (r_count < count) {
+		ssize_t ret = read(socket, buffer + r_count, 1);
+		if (ret == 0 || buffer[strlen(buffer) - 1] == '\n') {
+			break;
+		}
+		if (ret == -1){
+      if (errno == EINTR){
+        continue;
+      }else {
+        perror("read_head()");
+      }
+    }
+		r_count += ret;
+	}
+	return r_count;
+}
+
+
+int err_detect(size_t s1, size_t s2) {
+  if (s1 == 0 && s1 != s2) {
+    return 1;
+  } 
+  if (s1 < s2) {
+    return 1;
+  }
+  if (s1 > s2) {
+    return 1;
+  }
+  return 0;
 }
