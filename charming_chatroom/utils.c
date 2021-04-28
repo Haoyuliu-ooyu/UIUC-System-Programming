@@ -1,7 +1,7 @@
 /**
  * charming_chatroom
- * partner: peiyuan3, xinshuo3
  * CS 241 - Spring 2021
+ partner: haoyul4, xinshuo3
  */
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -41,40 +41,32 @@ ssize_t write_message_size(size_t size, int socket) {
 
 ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
     // Your Code Here
-    ssize_t word_cunt = count;
-    ssize_t total = 0;
-    while (word_cunt > 0) {
-        ssize_t result = read(socket, buffer + total, word_cunt);
-        if (result > 0) {
-            total += result;
-            word_cunt -= result;
-        }
-        if (result == -1 && errno != EINTR) {
+    ssize_t read_count = 0;
+    while (read_count < (ssize_t) count) {
+        ssize_t num_read = read(socket, buffer + read_count, count - read_count);
+        if (num_read == 0) {
             break;
-        }
-        if (result == 0) {
-            return 0;
+        } else if (num_read > 0) {
+            read_count += num_read;
+        } else if (num_read == -1 && errno != EINTR) {
+            return -1;
         }
     }
-    return count;
+    return read_count;
 }
 
 ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
     // Your Code Here
-    ssize_t word_cunt = count;
-    ssize_t total = 0;
-    while (word_cunt > 0) {
-        ssize_t result = write(socket, buffer + total, word_cunt);
-        if (result > 0) {
-            total += result;
-            word_cunt -= result;
-        }
-        if (result == -1 && errno != EINTR) {
+    ssize_t write_count = 0;
+    while (write_count < (ssize_t) count) {
+        ssize_t num_write = write(socket, buffer + write_count, count - write_count);
+        if (num_write == 0) {
             break;
-        }
-        if (result == 0) {
-            return 0;
+        } else if (num_write > 0) {
+            write_count += num_write;
+        } else if (num_write == -1 && errno != EINTR) {
+            return -1;
         }
     }
-    return count;
+    return write_count;
 }

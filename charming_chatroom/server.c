@@ -1,8 +1,7 @@
 /**
  * charming_chatroom
  * CS 241 - Spring 2021
-  partner: peiyuan3, xinshuo3
-
+ partner: haoyul4, xinshuo3
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -35,25 +34,25 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
  * Used to set flag to end server.
  */
 void close_server() {
-    endSession = 1;
-    // add any additional flags here you want.
-    int i = 0;
-    for (; i < MAX_CLIENTS; i++){
-        if (clients[i] != -1){
-            if (shutdown(clients[i], SHUT_RDWR) != 0){ 
-                perror("no more data");
-            }
-        if (close(clients[i]) != 0)  {
-            perror("close file");
-        }
-      }
-    }
-    if( shutdown(serverSocket, SHUT_RDWR) != 0) {
-        perror("no more data");
-    }
-    if (close(serverSocket) != 0) {
-        perror("close");
-    }
+ endSession = 1;
+ // add any additional flags here you want.
+ int i = 0;
+ for (; i < MAX_CLIENTS; i++){
+ if (clients[i] != -1){
+ if (shutdown(clients[i], SHUT_RDWR) != 0){ 
+ perror("client shutdown()");
+ }
+ if (close(clients[i]) != 0) {
+ perror("client close()");
+ }
+ }
+ }
+ if( shutdown(serverSocket, SHUT_RDWR) != 0) {
+ perror("server shutdown()");
+ }
+ if (close(serverSocket) != 0) {
+ perror("server close()");
+ }
 }
 
 /**
@@ -62,24 +61,24 @@ void close_server() {
  * here.
  */
 void cleanup() {
-    if (shutdown(serverSocket, SHUT_RDWR) != 0) {
-        perror("shutdown():");
-    }
-    close(serverSocket);
+ if (shutdown(serverSocket, SHUT_RDWR) != 0) {
+ perror("shutdown():");
+ }
+ close(serverSocket);
 
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i] != -1) {
-            if (shutdown(clients[i], SHUT_RDWR) != 0) {
-                perror("shutdown(): ");
-            }
-            close(clients[i]);
-        }
-    }
+ for (int i = 0; i < MAX_CLIENTS; i++) {
+ if (clients[i] != -1) {
+ if (shutdown(clients[i], SHUT_RDWR) != 0) {
+ perror("shutdown(): ");
+ }
+ close(clients[i]);
+ }
+ }
 }
 
 /**
  * Sets up a server connection.
- * Does not accept more than MAX_CLIENTS connections.  If more than MAX_CLIENTS
+ * Does not accept more than MAX_CLIENTS connections. If more than MAX_CLIENTS
  * clients attempts to connects, simply shuts down
  * the new client and continues accepting.
  * Per client, a thread should be created and 'process_client' should handle
@@ -90,158 +89,156 @@ void cleanup() {
  *
  * If any networking call fails, the appropriate error is printed and the
  * function calls exit(1):
- *    - fprtinf to stderr for getaddrinfo
- *    - perror() for any other call
+ * - fprtinf to stderr for getaddrinfo
+ * - perror() for any other call
  */
 void run_server(char *port) {
-    struct addrinfo info;
-    memset(&info, 0, sizeof(struct addrinfo));
-    info.ai_family = AF_INET;
-    info.ai_socktype = SOCK_STREAM;
-    info.ai_flags = AI_PASSIVE;
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket == -1) {
-        perror("not workin");
-        exit(1);
-    }
+ // code from coursebook
+ struct addrinfo hints, *result;
+ memset(&hints, 0, sizeof(struct addrinfo));
+ hints.ai_family = AF_INET;
+ hints.ai_socktype = SOCK_STREAM;
+ hints.ai_flags = AI_PASSIVE;
 
-    struct addrinfo *r;
-    int temp = getaddrinfo(NULL, port, &info, &r);
-    if(temp){
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(temp));
-        exit(1);
-    }
-    int o = 1;
-    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEPORT, &o, sizeof(o)) == -1) {
-        perror("setsockopt failed");
-        exit(1);
-    }
-    if (bind(serverSocket, r->ai_addr, r->ai_addrlen)) {
-        perror("bind failed");
-        exit(1);
-    }
-    if (listen(serverSocket, MAX_CLIENTS)) {
-        perror("listen failed");
-        exit(1);
-    }
-    int i = 0;
-    for(; i < MAX_CLIENTS; i++){
-        clients[i] = -1;
-    }
-    pthread_t threads[MAX_CLIENTS];
-    while( !endSession ) {
-        pthread_mutex_lock(&mutex);
-        if (clientsCount > MAX_CLIENTS) {
-            pthread_mutex_unlock(&mutex);
-            continue;
-        }
-        int fd_addr = accept(serverSocket, NULL, NULL);
-        if (fd_addr == -1) {
-            perror("accept failed");
-            exit(1);
-        }
-        i = 0;
-        for (; i < MAX_CLIENTS; i++) {
-            if (clients[i] == -1) {
-                clients[i] = fd_addr;
-                clientsCount ++;
-                pthread_create(threads+i, NULL, process_client, (void*)(intptr_t)i);
-                break;
-            }
-        }
-    }
-    freeaddrinfo(r);
+ int s = getaddrinfo(NULL, port, &hints, &result);
+ if (s != 0) {
+ freeaddrinfo(result);
+ fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+ exit(1);
+ }
 
-    /*QUESTION 1*/
-    /*QUESTION 2*/
-    /*QUESTION 3*/
+ serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+ if (serverSocket == -1) {
+ freeaddrinfo(result);
+ perror("socket");
+ exit(1);
+ }
 
-    /*QUESTION 8*/
+ int o = 1;
+ if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEPORT, &o, sizeof(o)) == -1) {
+ freeaddrinfo(result);
+ perror("setsockopt failed");
+ exit(1);
+ }
+ if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &o, sizeof(o)) == -1) {
+ freeaddrinfo(result);
+ perror("setsockopt failed");
+ exit(1);
+ }
 
-    /*QUESTION 4*/
-    /*QUESTION 5*/
-    /*QUESTION 6*/
-
-    /*QUESTION 9*/
-
-    /*QUESTION 10*/
+ if (bind(serverSocket, result->ai_addr, result->ai_addrlen) != 0) {
+ freeaddrinfo(result);
+ perror("bind failed");
+ exit(1);
+ }
+ if (listen(serverSocket, MAX_CLIENTS) != 0) {
+ freeaddrinfo(result);
+ perror("listen failed");
+ exit(1);
+ }
+ int i = 0;
+ for(; i < MAX_CLIENTS; i++){
+ clients[i] = -1;
+ }
+ pthread_t pids[MAX_CLIENTS];
+ while( !endSession ) {
+ if (clientsCount >= MAX_CLIENTS) {
+ continue;
+ }
+ int client_fd = accept(serverSocket, NULL, NULL);
+ if (client_fd == -1) {
+ perror("accept failed");
+ exit(1);
+ }
+ i = 0;
+ for (; i < MAX_CLIENTS; i++) {
+ if (clients[i] == -1) {
+ clients[i] = client_fd;
+ clientsCount ++;
+ // create a thread for connected client
+ pthread_create(pids+i, NULL, process_client, (void*)(intptr_t)i);
+ break;
+ }
+ }
+ }
+ freeaddrinfo(result);
 }
 
 /**
  * Broadcasts the message to all connected clients.
  *
- * message  - the message to send to all clients.
- * size     - length in bytes of message to send.
+ * message - the message to send to all clients.
+ * size - length in bytes of message to send.
  */
 void write_to_clients(const char *message, size_t size) {
-    pthread_mutex_lock(&mutex);
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i] != -1) {
-            ssize_t retval = write_message_size(size, clients[i]);
-            if (retval > 0) {
-                retval = write_all_to_socket(clients[i], message, size);
-            }
-            if (retval == -1) {
-                perror("write(): ");
-            }
-        }
-    }
-    pthread_mutex_unlock(&mutex);
+ pthread_mutex_lock(&mutex);
+ for (int i = 0; i < MAX_CLIENTS; i++) {
+ if (clients[i] != -1) {
+ ssize_t retval = write_message_size(size, clients[i]);
+ if (retval > 0) {
+ retval = write_all_to_socket(clients[i], message, size);
+ }
+ if (retval == -1) {
+ perror("write(): ");
+ }
+ }
+ }
+ pthread_mutex_unlock(&mutex);
 }
 
 /**
  * Handles the reading to and writing from clients.
  *
- * p  - (void*)intptr_t index where clients[(intptr_t)p] is the file descriptor
+ * p - (void*)intptr_t index where clients[(intptr_t)p] is the file descriptor
  * for this client.
  *
  * Return value not used.
  */
 void *process_client(void *p) {
-    pthread_detach(pthread_self());
-    intptr_t clientId = (intptr_t)p;
-    ssize_t retval = 1;
-    char *buffer = NULL;
+ pthread_detach(pthread_self());
+ intptr_t clientId = (intptr_t)p;
+ ssize_t retval = 1;
+ char *buffer = NULL;
 
-    while (retval > 0 && endSession == 0) {
-        retval = get_message_size(clients[clientId]);
-        if (retval > 0) {
-            buffer = calloc(1, retval);
-            retval = read_all_from_socket(clients[clientId], buffer, retval);
-        }
-        if (retval > 0)
-            write_to_clients(buffer, retval);
+ while (retval > 0 && endSession == 0) {
+ retval = get_message_size(clients[clientId]);
+ if (retval > 0) {
+ buffer = calloc(1, retval);
+ retval = read_all_from_socket(clients[clientId], buffer, retval);
+ }
+ if (retval > 0)
+ write_to_clients(buffer, retval);
 
-        free(buffer);
-        buffer = NULL;
-    }
+ free(buffer);
+ buffer = NULL;
+ }
 
-    printf("User %d left\n", (int)clientId);
-    close(clients[clientId]);
+ printf("User %d left\n", (int)clientId);
+ close(clients[clientId]);
 
-    pthread_mutex_lock(&mutex);
-    clients[clientId] = -1;
-    clientsCount--;
-    pthread_mutex_unlock(&mutex);
+ pthread_mutex_lock(&mutex);
+ clients[clientId] = -1;
+ clientsCount--;
+ pthread_mutex_unlock(&mutex);
 
-    return NULL;
+ return NULL;
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "%s <port>\n", argv[0]);
-        return -1;
-    }
+ if (argc != 2) {
+ fprintf(stderr, "%s <port>\n", argv[0]);
+ return -1;
+ }
 
-    struct sigaction act;
-    memset(&act, '\0', sizeof(act));
-    act.sa_handler = close_server;
-    if (sigaction(SIGINT, &act, NULL) < 0) {
-        perror("sigaction");
-        return 1;
-    }
+ struct sigaction act;
+ memset(&act, '\0', sizeof(act));
+ act.sa_handler = close_server;
+ if (sigaction(SIGINT, &act, NULL) < 0) {
+ perror("sigaction");
+ return 1;
+ }
 
-    run_server(argv[1]);
-    cleanup();
-    pthread_exit(NULL);
+ run_server(argv[1]);
+ cleanup();
+ pthread_exit(NULL);
 }
