@@ -1,6 +1,7 @@
 /**
  * savvy_scheduler
  * CS 241 - Spring 2021
+ * partners: xinshuo3 peiyuan3
  */
 #include "libpriqueue/libpriqueue.h"
 #include "libscheduler.h"
