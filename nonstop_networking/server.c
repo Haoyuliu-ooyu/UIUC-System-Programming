@@ -82,9 +82,9 @@ void shutdown_server() {
     VECTOR_FOR_EACH(v, i, {free(i);});
     vector_destroy(v);
     dictionary_destroy(client_dictionary);
+	remove(dir_);
     vector_destroy(file_vector);
     dictionary_destroy(file_size);
-    remove(dir_);
     exit(1);
 }
 
@@ -235,33 +235,7 @@ void epoll_mod(int client_file_descriptor) {
 
 void process_method(int client_file_descriptor, C_info *info) {
   
-  // DELETE
-    if (info->method == DELETE) {
-		int len = strlen(dir_) + strlen(info->filename) + 2;
-		char path[len];
-		memset(path, 0, len);
-		sprintf(path, "%s/%s", dir_, info->filename);
-		if (remove(path) < 0) {
-			info->status = -3;
-			return;
-		}
-		size_t i = 0;
-		VECTOR_FOR_EACH(file_vector, name, {
-	        if (!strcmp((char *) name, info->filename)) {
-                break;
-            }
-			i++;
-	 	});
-		size_t v_size= vector_size(file_vector);
-		if (i == v_size) {
-			info->status = -3;
-			return;
-		}
-		vector_erase(file_vector, i);
-		dictionary_remove(file_size, info->filename);
-		write_to_socket(client_file_descriptor, "OK\n", 3);
-        //GET 
-    } else if (info->method == GET) {
+  	if (info->method == GET) {
 		int len = strlen(dir_) + strlen(info->filename) + 1;
 		char path[len];
 		memset(path, 0, len);
@@ -292,6 +266,32 @@ void process_method(int client_file_descriptor, C_info *info) {
     // PUT
 	} else if (info->method == PUT) {
 		write_to_socket(client_file_descriptor, "OK\n", 3);
+		// DELETE
+    } else if (info->method == DELETE) {
+		int len = strlen(dir_) + strlen(info->filename) + 2;
+		char path[len];
+		memset(path, 0, len);
+		sprintf(path, "%s/%s", dir_, info->filename);
+		if (remove(path) < 0) {
+			info->status = -3;
+			return;
+		}
+		size_t i = 0;
+		VECTOR_FOR_EACH(file_vector, name, {
+	        if (!strcmp((char *) name, info->filename)) {
+                break;
+            }
+			i++;
+	 	});
+		size_t v_size= vector_size(file_vector);
+		if (i == v_size) {
+			info->status = -3;
+			return;
+		}
+		vector_erase(file_vector, i);
+		dictionary_remove(file_size, info->filename);
+		write_to_socket(client_file_descriptor, "OK\n", 3);
+        //GET 
     // LIST
 	} else if (info->method == LIST) {
 		write_to_socket(client_file_descriptor, "OK\n", 3);
