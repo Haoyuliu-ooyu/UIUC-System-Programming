@@ -21,7 +21,7 @@ char *minixfs_virtual_path_names[] = {"info", /* add your paths here*/};
 
 /**
  * Forward declaring block_info_string so that we can attach unused on it
- * This prevents a compiler warning if you haven't used it yet.
+ * This prevents a compiler warning if you haven't used it .
  *
  * This function generates the info string that the virtual endpoint info should
  * emit when read
@@ -76,33 +76,39 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
     // Land ahoy!
-    if (valid_filename(path) == 1 || get_inode(fs, path)) {
+    if (valid_filename(path) == 1 || get_inode(fs, path)) { //not valid.
         return NULL;
     }
-    const char* file_name = NULL;
-    inode* parent = parent_directory(fs, path, &file_name);
-    if (!parent || !is_directory(parent)) {
+    const char* filengthame = NULL;
+    inode* parent = parent_directory(fs, path, &filengthame);
+    if (!parent || !is_directory(parent)) { //not a directory or parent dont exist.
         return NULL;
     }
-    if (first_unused_inode(fs) == -1) {
+    inode_number inode_n = first_unused_inode(fs);
+    if (inode_n == -1) {
         return NULL;
     }
-    inode* new_node = fs->inode_root + first_unused_inode(fs);
+    inode* new_node = fs->inode_root + inode_n;
+    //create a file
     init_inode(parent, new_node);
-    minixfs_dirent d;
-    d.name = (char*)file_name;
-    d.inode_num = first_unused_inode(fs);
-    int index = parent->size / sizeof(data_block);
-    if (index >= NUM_DIRECT_BLOCKS) {
-        return NULL;
-    }
+    ///create dir
+    minixfs_dirent dir_;
+    dir_.name = (char*) filengthame;
+    dir_.inode_num = inode_n;
+
     int offset = parent->size % sizeof(data_block);
     if (!offset && add_data_block_to_inode(fs, parent) == -1) {
         return NULL;
     }
-    void* start_block = get_block(fs, parent, index) + offset;
-    memset(start_block, 0, sizeof(data_block));
-    make_string_from_dirent(start_block, d);
+
+    int idx = parent->size / sizeof(data_block);
+    if (idx >= NUM_DIRECT_BLOCKS){
+        return NULL;
+    }
+    void* startblock = get_block(fs, parent, idx) + offset;
+    memset(startblock, 0, sizeof(data_block));
+    make_string_from_dirent(startblock, dir_);
+    // update size
     parent->size += MAX_DIR_NAME_LEN;
     return new_node;
 }
@@ -120,9 +126,9 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
             }
         }
         char* info_str = block_info_string(used);
-        size_t len = strlen(info_str);
-        if (*off > (off_t)len) {return 0;}
-        if (count > len - *off) {count = len - *off;}
+        size_t length = strlen(info_str);
+        if (*off > (off_t)length) {return 0;}
+        if (count > length - *off) {count = length - *off;}
         memmove(buf, info_str + *off, count);
         *off += count;
         return count;
@@ -134,59 +140,57 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
 ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
                       size_t count, off_t *off) {
     // X marks the spot
-    inode* target = get_inode(fs, path);
-    if (target == NULL) {
-        target = minixfs_create_inode_for_path(fs, path);
-        if (target == NULL) {
+     inode* node = get_inode(fs, path);
+    
+    if (!node) {
+        node = minixfs_create_inode_for_path(fs, path);
+        if (!node) {
             errno = ENOSPC;
             return -1;
         }
     }
-    uint64_t maxi = sizeof(data_block) * (NUM_DIRECT_BLOCKS + NUM_INDIRECT_BLOCKS);
-    //
-    if (count + *off > maxi) {
+    uint64_t limit = (NUM_DIRECT_BLOCKS + NUM_INDIRECT_BLOCKS) * sizeof(data_block);
+    int count_b = (count + *off + sizeof(data_block) - 1) / sizeof(data_block);
+    if (count + *off > limit) {
         errno = ENOSPC;
         return -1;
     }
-    //
-    int block_count = (count + *off + sizeof(data_block) - 1)/sizeof(data_block);
-    if (minixfs_min_blockcount(fs, path, block_count) == -1) {
+    if ( minixfs_min_blockcount(fs, path, count_b) == -1) {
         errno = ENOSPC;
         return -1;
     }
-    //
-    uint64_t index = *off / sizeof(data_block);
+    uint64_t idx = *off / sizeof(data_block);
     size_t offset = *off % sizeof(data_block);
-    uint64_t size = 0;
+    uint64_t length = 0;
     if (count > sizeof(data_block) - offset) {
-        size = sizeof(data_block) - offset;
+        length = sizeof(data_block) - offset;
     } else {
-        size = count;
+        length = count;
     }
-    void* mem_block = get_block(fs, target, index) + offset;
-    memcpy(mem_block, buf, size);
-    uint64_t temp_count = size;
-    *off += size;
-    index++;
-    while (temp_count < count) {
-        if(count - temp_count > sizeof(data_block)){
-            size = sizeof(data_block);
-        }else{
-            size = count - temp_count;
+    void * memory_block = get_block(fs, node, idx) + offset;
+    memcpy(memory_block, buf, length);
+    uint64_t write_count = length;
+    *off += length;
+    idx++;
+    while (write_count < count) { //legit
+        if (count - write_count > sizeof(data_block)) {
+            length = sizeof(data_block);
+        } else {
+            length = count - write_count;
         }
-        mem_block = get_block(fs, target, index);
-        memcpy(mem_block, buf + temp_count, size);
-        temp_count += size;
-        *off += size;
-        index ++;
+        memory_block = get_block(fs, node, idx);
+        memcpy(memory_block, buf + write_count, length);
+        write_count += length;
+        *off += length;
+        idx++;
+
     }
-    if(count + *off > target->size){
-        target->size  = count + *off;
+    if(count + *off > node->size){
+        node->size  = count + *off;
     }
-    //update atim and mtim
-    clock_gettime(CLOCK_REALTIME, &target->atim);
-    clock_gettime(CLOCK_REALTIME, &target->mtim);
-    return temp_count;
+    clock_gettime(CLOCK_REALTIME, &node->atim);
+    clock_gettime(CLOCK_REALTIME, &node->mtim);
+    return write_count;
 }
 
 ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
