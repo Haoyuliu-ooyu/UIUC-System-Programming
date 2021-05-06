@@ -76,11 +76,7 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
     // Land ahoy!
-    if (valid_filename(path) != 1) {
-        return NULL;
-    }
-    if (get_inode(fs, path)) {
-        //clock_gettime(CLOCK_REALTIME, &(i->ctim));
+    if (valid_filename(path) == 1 || get_inode(fs, path)) {
         return NULL;
     }
     const char* file_name = NULL;
@@ -91,7 +87,6 @@ inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
     if (first_unused_inode(fs) == -1) {
         return NULL;
     }
-
     inode* new_node = fs->inode_root + first_unused_inode(fs);
     init_inode(parent, new_node);
     minixfs_dirent d;
@@ -126,7 +121,7 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
         }
         char* info_str = block_info_string(used);
         size_t len = strlen(info_str);
-        if (*off > (int)len) {return 0;}
+        if (*off > (off_t)len) {return 0;}
         if (count > len - *off) {count = len - *off;}
         memmove(buf, info_str + *off, count);
         *off += count;
