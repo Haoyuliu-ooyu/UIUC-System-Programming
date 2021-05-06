@@ -420,10 +420,9 @@ int external(char* command, vector* inputs) {
             int error = waitpid(pid, &status, 0);
             if (error == -1) {
                 print_wait_failed();
-                shell_exit(-1);
             } else if (WIFEXITED(status)) {
                 if (WEXITSTATUS(status) != 0){
-                    shell_exit(1);
+                    return 1;
                 }
                 fflush(stdout);
                 //set_process_status(pid, STATUS_KILLED);
