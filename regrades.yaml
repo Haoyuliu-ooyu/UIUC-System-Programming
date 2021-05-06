@@ -10,7 +10,7 @@ assignments:
   critical_concurrency: false
   deadlock_demolition: false
   extreme_edge_cases: false
-  finding_filesystems: false
+  finding_filesystems: true
   ideal_indirection: false
   luscious_locks: false
   mad_mad_access_patterns: false
@@ -25,8 +25,8 @@ assignments:
   deepfried_dd: false
   savvy_scheduler: false
   shell:
-    pt1: false
-    pt2: false
+    pt1: true
+    pt2: true
   teaching_threads: false
   utilities_unleashed: false
   vector: false
