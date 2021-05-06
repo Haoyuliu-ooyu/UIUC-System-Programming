@@ -16,6 +16,8 @@
 #include <signal.h>
 #include <fcntl.h>
  #include <sys/stat.h>
+ 
+extern char *optarg;
 
 typedef struct process {
     char *command;
@@ -579,7 +581,6 @@ void shell_processes() {
         }
     }
 }
-
 //exit
 void shell_exit(int s) {
     if (history_file != NULL) {
