@@ -213,18 +213,20 @@ int execute_single(int command_id, char *command, int save_to_history) {
         }
         return 0;
     } else if (command_id == 3) {
-        if (size != 1 || strlen((char*) vector_get(splited, 0)) == 1) {
-            print_invalid_command(command);
+        if (size == 1 && strlen((char*) vector_get(splited, 0)) != 1) {
+            size_t index = atoi((char*) vector_get(splited, 0)+1);
+            if (index < vector_size(history)) {
+                char *cmd = vector_get(history, index);
+                print_command(cmd);
+                sstring_destroy(sstr);
+                vector_destroy(splited);
+                return execute_single(define_command(cmd), cmd, save_to_history);
+            } 
+            print_invalid_index();
+            sstring_destroy(sstr);
+            vector_destroy(splited);
             return 1;
         }
-        size_t index = atoi((char*) vector_get(splited, 0)+1);
-        if (index < vector_size(history)) {
-            char *cmd = vector_get(history, index);
-            print_command(cmd);
-            return execute_single(define_command(cmd), cmd, save_to_history);
-        }
-        print_invalid_index();
-        return 1;
     } else if (command_id == 4) {
         if (size != 1) {
             print_invalid_command(command);
