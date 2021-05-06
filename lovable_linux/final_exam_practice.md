@@ -1,6 +1,8 @@
 # Angrave's 2020 Acme CS 241 Exam Prep		
 ## A.K.A. Preparing for the Final Exam & Beyond CS 241... 
 
+#parner: peiyuan3
+
 Some of the questions require research (wikibook; websearch; wikipedia). 
 It is accepted to work together and discuss answers, but please make an honest attempt first! 
 Be ready to discuss and clear confusions & misconceptions in your last discussion section.
@@ -17,7 +19,7 @@ Be awesome. Angrave.
 
 
 3.	When is `strlen(s)` != `1+strlen(s+1)` ?
-    when strlen(s) = 1
+    when strlen(s) = 0， s+1 points to unknown bytes.
 
 4.	How are C strings represented in memory? What is the wrong with `malloc(strlen(s))` when copying strings?
     Chars with a '\0' at the end. `malloc(strlen(s))` does not allocate space for the last byte.
